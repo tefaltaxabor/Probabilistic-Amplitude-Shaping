@@ -50,5 +50,5 @@ The implementation follows the PAS architecture of Böcherer, Steiner & Schulte 
 
 ## Author
 
-Gabriel Cabrera — Bachelor's thesis, Communications Engineering
+Gabriel Cabrera — Bachelor's thesis, Electrical and Computer Engineering
 Institute for Communications Engineering (LNT/ICE), Technical University of Munich
