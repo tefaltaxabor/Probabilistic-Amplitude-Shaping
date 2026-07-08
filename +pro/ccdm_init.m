@@ -59,10 +59,10 @@ function ccdm = ccdm_init(pA, amps, n)
     k = floor(logNperm);
 
     % --- 4. Entropy of the quantized type and rate loss ---
-    p = pQuant(pQuant > 0);
-    Hbar  = -sum(p .* log2(p));             % H(Abar) [bits/amp]
-    Rccdm = k / n;                          % (2.58)
-    Rloss = Hbar - Rccdm;                   % rate loss (Remark 2.4)
+    p = pQuant(pQuant > 0); %support vector
+    Hbar  = -sum(p .* log2(p)); % H(Abar) [bits/amp]
+    Rccdm = k / n; % (2.58)
+    Rloss = Hbar - Rccdm; % rate loss (Remark 2.4)
 
     ccdm.n        = n;
     ccdm.M        = M;

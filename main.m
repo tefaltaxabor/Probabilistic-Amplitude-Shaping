@@ -1,27 +1,25 @@
 %% Gabriel Cabrera
-%% 64-QAM PAS with FEC and REAL CCDM -- SNR sweep (no HARQ)
+%% 64-QAM PAS with FEC and REAL CCDM -- SNR sweep (no HARQ) -- OPTIMIZED
 %
-%  Adapted from the fake-CCDM sweep: draw_amplitude_bits is replaced by a REAL
-%  invertible CCDM (ccdm_encode_mex) applied independently to the I and Q
-%  dimensions (64-QAM = 2 x 8-ASK). Metrics kept from the original sweep:
-%    - BER pre-FEC   (hard decision on all coded bits)
-%    - BER post-FEC  (on the systematic amplitude bits)
-%    - BLER          (codeword/FECFRAME error rate)
-%  ADDED: honest information FER, measured through the inverse CCDM (an error
-%  confined to parity/signs does NOT count as an info error; Bocherer eq. 2.1).
+%  Speed fixes vs. the previous version:
+%   (1) NO ismember. amp<->bit conversions use precomputed lookup tables and
+%       vectorized indexing (thousands of times faster than row-wise ismember).
+%   (2) ACK shortcut: ccdm_decode is skipped whenever the decoded amplitude
+%       bits equal the transmitted ones (info then matches for sure). The CCDM
+%       inverse runs only on frames that actually differ.
+%  Net effect: the LDPC decoder (fec.decode) becomes the dominant cost, as it
+%  should be.
 %
-%  Prereqs: ccdm_encode_mex / ccdm_decode_mex compiled and on the path.
-%
-%  Checklist ref (Steiner): p.62 red curve, p.83 CCDM 8-ASK, p.123 blue curve.
+%  Prereqs: pro.ccdm_encode_mex / pro.ccdm_decode_mex compiled and on the path.
 
 clear; rng(7);
 
 % ---------------- Parameters ----------------
 m       = 3;
-nu      = 0.05;                      % Maxwell-Boltzmann parameter
+nu      = 0.05;
 SNR_dB  = 6:0.3:15;
 
-maxFrames   = 1000;
+maxFrames   = 2e4;
 targetCwErr = 40;
 maxLDPCIter = 20;
 
@@ -36,68 +34,75 @@ cfg = fec.pas_config(m, 'dvbs2-2/3');
 n   = cfg.n;
 
 % ---------------- REAL CCDM setup ----------------
-nDM = 200;                           % must divide n (21600 = 200*108)
+nDM = 200;
 assert(mod(n,nDM)==0, 'nDM must divide n');
 ccdm    = pro.ccdm_init(pA, amps, nDM);
 nBlocks = n / nDM;
 kDM     = ccdm.k;
 comp    = ccdm.comp;
-infoBitsPerDim = nBlocks * kDM;      % info bits carried per real dimension
+
+% ---------------- PRECOMPUTED LOOKUP TABLES (replaces ismember) ----------
+% amp_label is (M x m-1): row i is the (m-1)-bit label of amps(i).
+% Interpret each label as a binary number -> index into a LUT.
+wbin     = (2.^(size(amp_label,2)-1:-1:0)).';    % binary weights, e.g. [2;1]
+labelVal = double(amp_label) * wbin;                     % (M x 1) decimal value per label
+bits2amp = zeros(2^(m-1), 1);
+bits2amp(labelVal + 1) = amps;                   % LUT: label value -> amplitude
+amp2idx  = zeros(max(amps), 1);
+amp2idx(amps) = 1:numel(amps);                   % amplitude value -> 1..M
+
+% sanity: LUT reproduces the row-wise mapping exactly
+for i = 1:numel(amps)
+    assert(bits2amp(double(amp_label(i,:))*wbin + 1) == amps(i), 'LUT mismatch');
+end
 
 fprintf('FEC: %s | N=%d K=%d Rc=%.4f | n=%d symbols/dim\n', ...
         cfg.code, cfg.N, cfg.K, cfg.Rc, n);
 fprintf('CCDM: nDM=%d, k=%d, Rccdm=%.4f, Rloss=%.4f bits/amp\n', ...
         ccdm.n, ccdm.k, ccdm.Rccdm, ccdm.Rloss);
 fprintf('Info bits/dim=%d | SE_info=%.4f bits/cx-sym (2 dims)\n', ...
-        infoBitsPerDim, 2*infoBitsPerDim/n);
+        nBlocks*kDM, 2*nBlocks*kDM/n);
 
 % ---------------- Sweep ----------------
 nPts    = numel(SNR_dB);
 berPre  = nan(1, nPts);
 berPost = nan(1, nPts);
 bler    = nan(1, nPts);
-ferInfo = nan(1, nPts);              % NEW: honest information FER
+ferInfo = nan(1, nPts);
 
-pool = gcp('nocreate'); if isempty(pool), parpool(6); end
+%pool = gcp('nocreate'); if isempty(pool), parpool(6); end
 
-parfor p = 1:nPts
+for p = 1:nPts
     snr = SNR_dB(p);
     bitErrPre=0; nBitsPre=0; bitErrPost=0; nBitsPost=0;
     cwErr=0; nCw=0; infoErr=0; nInfoCw=0;
     t0 = tic;
 
     for f = 1:maxFrames
-        % --- TX: REAL CCDM per dimension -> amplitudes -> amp_bits ---
-        [ampI_bits, infoI] = local_ccdm_tx(nBlocks, nDM, kDM, comp, amps, amp_label, m);
-        [ampQ_bits, infoQ] = local_ccdm_tx(nBlocks, nDM, kDM, comp, amps, amp_label, m);
+        % --- TX: REAL CCDM per dimension (vectorized amp->bits) ---
+        [ampI_bits, infoI] = tx_ccdm(nBlocks, nDM, kDM, comp, amps, amp2idx, amp_label);
+        [ampQ_bits, infoQ] = tx_ccdm(nBlocks, nDM, kDM, comp, amps, amp2idx, amp_label);
 
-        % --- PAS FEC: systematic = amplitude, parity = sign ---
-        bitsI = fec.encode(ampI_bits, cfg);                 % (n, m)
+        bitsI = fec.encode(ampI_bits, cfg);
         bitsQ = fec.encode(ampQ_bits, cfg);
 
-        % --- Mapping to 64-QAM ---
         xI = pro.map(bitsI, cstll);
         xQ = pro.map(bitsQ, cstll);
         x  = xI + 1j*xQ;
 
-        % --- Complex AWGN channel ---
         [y, sigma2] = channel.complex_channel(x, snr, n);
 
-        % --- RX: demap per dimension (noise sigma2/2 per real dim) ---
-        llrI = pro.demap(real(y), cstll, sigma2/2, 'SD');   % (n, m)
+        llrI = pro.demap(real(y), cstll, sigma2/2, 'SD');
         llrQ = pro.demap(imag(y), cstll, sigma2/2, 'SD');
 
-        % --- Pre-FEC BER (hard decision over all bits) ---
         hdI = uint8(llrI < 0);  hdQ = uint8(llrQ < 0);
         bitErrPre = bitErrPre + sum(hdI(:) ~= uint8(bitsI(:))) ...
                               + sum(hdQ(:) ~= uint8(bitsQ(:)));
         nBitsPre  = nBitsPre + numel(bitsI) + numel(bitsQ);
 
-        % --- FEC decode ---
-        ampI_hat = fec.decode(llrI, cfg, maxLDPCIter);      % (n, m-1)
+        ampI_hat = fec.decode(llrI, cfg, maxLDPCIter);   % <-- the real cost
         ampQ_hat = fec.decode(llrQ, cfg, maxLDPCIter);
 
-        % --- Post-FEC BER and BLER (systematic amplitude bits) ---
         eI = sum(ampI_hat(:) ~= ampI_bits(:));
         eQ = sum(ampQ_hat(:) ~= ampQ_bits(:));
         bitErrPost = bitErrPost + eI + eQ;
@@ -105,9 +110,11 @@ parfor p = 1:nPts
         cwErr = cwErr + (eI > 0) + (eQ > 0);
         nCw   = nCw + 2;
 
-        % --- HONEST info FER through inverse CCDM (per dimension) ---
-        infoErr = infoErr + local_ccdm_info_err(ampI_hat, infoI, nBlocks, nDM, kDM, comp, amps, amp_label);
-        infoErr = infoErr + local_ccdm_info_err(ampQ_hat, infoQ, nBlocks, nDM, kDM, comp, amps, amp_label);
+        % --- info FER with ACK shortcut (vectorized amp recovery) ---
+        infoErr = infoErr + info_err_fast(ampI_hat, ampI_bits, infoI, eI, ...
+                              nBlocks, nDM, kDM, comp, amps, wbin, bits2amp);
+        infoErr = infoErr + info_err_fast(ampQ_hat, ampQ_bits, infoQ, eQ, ...
+                              nBlocks, nDM, kDM, comp, amps, wbin, bits2amp);
         nInfoCw = nInfoCw + 2;
 
         if cwErr >= targetCwErr, break; end
@@ -141,38 +148,38 @@ save('results/pas64qam_realccdm.mat','SNR_dB','berPre','berPost','bler','ferInfo
 fprintf('Saved results/pas64qam_realccdm.mat\n');
 
 % ======================================================================
-%  Helpers (chain-specific: match your amp_label convention)
+%  Helpers -- vectorized, no ismember
 % ======================================================================
-function [amp_bits, info] = local_ccdm_tx(nBlocks, nDM, kDM, comp, amps, amp_label, m)
-% Generate one real-dimension frame via REAL CCDM. Returns amp_bits (n x m-1)
-% and the info bits (nBlocks x kDM) for the genie ACK.
+function [amp_bits, info] = tx_ccdm(nBlocks, nDM, kDM, comp, amps, amp2idx, amp_label)
+% One real-dimension frame via REAL CCDM. amp->bits via LUT (no ismember).
     info   = randi([0 1], nBlocks, kDM);
     ampSeq = zeros(nBlocks*nDM, 1);
     for b = 1:nBlocks
         aBlk = pro.ccdm_encode_mex(info(b,:), comp, amps);
         ampSeq((b-1)*nDM + (1:nDM)) = aBlk(:);
     end
-    [tf, loc] = ismember(ampSeq, amps);
-    assert(all(tf));
-    amp_bits = amp_label(loc, :);            % (n x m-1)
+    idx      = amp2idx(ampSeq);            % amplitude value -> row index (vectorized)
+    amp_bits = amp_label(idx, :);          % (n x m-1)
 end
 
-function e = local_ccdm_info_err(amp_hat, info, nBlocks, nDM, kDM, comp, amps, amp_label)
-% Returns 1 if ANY info block fails after inverse CCDM, else 0 (info FER).
-    n = size(amp_hat,1);
-    ampHat = zeros(1,n);
-    for j = 1:n
-        [tf, loc] = ismember(amp_hat(j,:), amp_label, 'rows');
-        if tf, ampHat(j) = amps(loc); else, e = 1; return; end
+function e = info_err_fast(amp_hat, amp_bits_tx, info, nBitErr, ...
+                           nBlocks, nDM, kDM, comp, amps, wbin, bits2amp)
+% Info FER with shortcut: if decoded amp bits == transmitted, info matches for
+% sure (CCDM is deterministic & invertible) -> no ccdm_decode needed.
+    if nBitErr == 0
+        e = 0; return;                     % fast path: perfect amp bits
     end
+    % Only reached when amp bits differ. Recover amplitudes (vectorized).
+    labelValHat = double(amp_hat) * wbin;          % (n x 1) label value per symbol
+    % guard: values must be valid label indices
+    ampHat = bits2amp(labelValHat + 1);    % (n x 1) amplitudes
     for b = 1:nBlocks
         seg = ampHat((b-1)*nDM + (1:nDM));
-        % invalid composition -> undecodable -> info error
         ok = true;
         for i = 1:numel(amps)
             if sum(seg==amps(i)) ~= comp(i), ok=false; break; end
         end
-        if ~ok, e = 1; return; end
+        if ~ok, e = 1; return; end         % invalid composition -> info error
         ib = pro.ccdm_decode_mex(seg, comp, amps, kDM);
         if ~isequal(ib, info(b,:)), e = 1; return; end
     end
