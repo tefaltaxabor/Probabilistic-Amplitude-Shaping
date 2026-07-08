@@ -1,89 +1,89 @@
 %% Gabriel Cabrera
-%% 64-QAM PAS with FEC -- SNR sweep
+%% 64-QAM PAS with FEC and REAL CCDM -- SNR sweep (no HARQ)
+%
+%  Adapted from the fake-CCDM sweep: draw_amplitude_bits is replaced by a REAL
+%  invertible CCDM (ccdm_encode_mex) applied independently to the I and Q
+%  dimensions (64-QAM = 2 x 8-ASK). Metrics kept from the original sweep:
+%    - BER pre-FEC   (hard decision on all coded bits)
+%    - BER post-FEC  (on the systematic amplitude bits)
+%    - BLER          (codeword/FECFRAME error rate)
+%  ADDED: honest information FER, measured through the inverse CCDM (an error
+%  confined to parity/signs does NOT count as an info error; Bocherer eq. 2.1).
+%
+%  Prereqs: ccdm_encode_mex / ccdm_decode_mex compiled and on the path.
+%
+%  Checklist ref (Steiner): p.62 red curve, p.83 CCDM 8-ASK, p.123 blue curve.
 
-%% check list
-% (hecho) hacer con ASK y hacerlo doble, (para mostrar equivalencia con 2XASK -QAM)
-
-% BMD(hacerlo...) bit metric decoding rate,
-
-% fabian steiner
-% page 62 (red curve)
-% page 83 (ccdm 8-ask) (hecho)
-% page 123 (curva azul) 
-
-%44 CCDM, rate...
-%% 
-
-% Shaping for Wireless
-% HARQ (not wifi) and ARQ
-% encontrar el benchmark para comparar
-
-%%
-% BCM, information theoreticals comparison.
 clear; rng(7);
 
 % ---------------- Parameters ----------------
-m       = 3;                         
+m       = 3;
 nu      = 0.05;                      % Maxwell-Boltzmann parameter
-SNR_dB  = 6:0.3:15;              
+SNR_dB  = 6:0.3:15;
 
-maxFrames     = 10000;                 
-targetCwErr   = 40;                 
-maxLDPCIter   = 50;                 
+maxFrames   = 1000;
+targetCwErr = 40;
+maxLDPCIter = 20;
+
 % ---------------- Constellation and shaping ----------------
 cstll = pro.dig_mod_ASK(m, "gray");
 [amp_label, amps] = pro.get_amplitude_label(cstll);
-
-[pA,px,~]= pro.build_shaping(nu,cstll,amps);
-
-cstll.px = px;                       % shaped priors for the demapper
+[pA, px, ~] = pro.build_shaping(nu, cstll, amps);
+cstll.px = px;
 
 % ---------------- FEC code ----------------
 cfg = fec.pas_config(m, 'dvbs2-2/3');
-n   = cfg.n;                         % QAM symbols per codeword and dimension
-fprintf('FEC: %s  | N=%d K=%d Rc=%.4f | n=%d symbols/dim/codeword\n', ...
+n   = cfg.n;
+
+% ---------------- REAL CCDM setup ----------------
+nDM = 200;                           % must divide n (21600 = 200*108)
+assert(mod(n,nDM)==0, 'nDM must divide n');
+ccdm    = pro.ccdm_init(pA, amps, nDM);
+nBlocks = n / nDM;
+kDM     = ccdm.k;
+comp    = ccdm.comp;
+infoBitsPerDim = nBlocks * kDM;      % info bits carried per real dimension
+
+fprintf('FEC: %s | N=%d K=%d Rc=%.4f | n=%d symbols/dim\n', ...
         cfg.code, cfg.N, cfg.K, cfg.Rc, n);
+fprintf('CCDM: nDM=%d, k=%d, Rccdm=%.4f, Rloss=%.4f bits/amp\n', ...
+        ccdm.n, ccdm.k, ccdm.Rccdm, ccdm.Rloss);
+fprintf('Info bits/dim=%d | SE_info=%.4f bits/cx-sym (2 dims)\n', ...
+        infoBitsPerDim, 2*infoBitsPerDim/n);
 
 % ---------------- Sweep ----------------
 nPts    = numel(SNR_dB);
 berPre  = nan(1, nPts);
 berPost = nan(1, nPts);
 bler    = nan(1, nPts);
-% --- example frame for shaping statistics (independent of SNR) ---
-x_ex = pro.map(fec.encode(pro.draw_amplitude_bits(n,pA,amp_label), cfg), cstll) ...
-     + 1j*pro.map(fec.encode(pro.draw_amplitude_bits(n,pA,amp_label), cfg), cstll);
+ferInfo = nan(1, nPts);              % NEW: honest information FER
 
-%% Parallel pool
-pool = gcp('nocreate');
-if isempty(pool)
-    parpool(6);
-end
-%%
+pool = gcp('nocreate'); if isempty(pool), parpool(6); end
+
 parfor p = 1:nPts
     snr = SNR_dB(p);
-    bitErrPre = 0; nBitsPre = 0;
-    bitErrPost = 0; nBitsPost = 0;
-    cwErr = 0; nCw = 0;
+    bitErrPre=0; nBitsPre=0; bitErrPost=0; nBitsPost=0;
+    cwErr=0; nCw=0; infoErr=0; nInfoCw=0;
     t0 = tic;
 
     for f = 1:maxFrames
-        % --- TX: shaped amplitude bits per dimension (fake CCDM) ---
-        ampI = pro.draw_amplitude_bits(n, pA, amp_label);   % (n, m-1)
-        ampQ = pro.draw_amplitude_bits(n, pA, amp_label);
+        % --- TX: REAL CCDM per dimension -> amplitudes -> amp_bits ---
+        [ampI_bits, infoI] = local_ccdm_tx(nBlocks, nDM, kDM, comp, amps, amp_label, m);
+        [ampQ_bits, infoQ] = local_ccdm_tx(nBlocks, nDM, kDM, comp, amps, amp_label, m);
 
         % --- PAS FEC: systematic = amplitude, parity = sign ---
-        bitsI = fec.encode(ampI, cfg);                      % (n, m)
-        bitsQ = fec.encode(ampQ, cfg);
+        bitsI = fec.encode(ampI_bits, cfg);                 % (n, m)
+        bitsQ = fec.encode(ampQ_bits, cfg);
 
         % --- Mapping to 64-QAM ---
-        xI = pro.map(bitsI, cstll);                         % (n,1)
+        xI = pro.map(bitsI, cstll);
         xQ = pro.map(bitsQ, cstll);
         x  = xI + 1j*xQ;
 
         % --- Complex AWGN channel ---
         [y, sigma2] = channel.complex_channel(x, snr, n);
 
-        % --- RX: demap per dimension (noise sigma2/2 per real dimension) ---
+        % --- RX: demap per dimension (noise sigma2/2 per real dim) ---
         llrI = pro.demap(real(y), cstll, sigma2/2, 'SD');   % (n, m)
         llrQ = pro.demap(imag(y), cstll, sigma2/2, 'SD');
 
@@ -97,105 +97,84 @@ parfor p = 1:nPts
         ampI_hat = fec.decode(llrI, cfg, maxLDPCIter);      % (n, m-1)
         ampQ_hat = fec.decode(llrQ, cfg, maxLDPCIter);
 
-        % --- Post-FEC BER and BLER (over the systematic amplitude bits) ---
-        eI = sum(ampI_hat(:) ~= ampI(:));
-        eQ = sum(ampQ_hat(:) ~= ampQ(:));
+        % --- Post-FEC BER and BLER (systematic amplitude bits) ---
+        eI = sum(ampI_hat(:) ~= ampI_bits(:));
+        eQ = sum(ampQ_hat(:) ~= ampQ_bits(:));
         bitErrPost = bitErrPost + eI + eQ;
-        nBitsPost  = nBitsPost + numel(ampI) + numel(ampQ);
-        cwErr = cwErr + (eI > 0) + (eQ > 0);   % +1 per failed codeword (FECFRAME)
-        nCw   = nCw + 2;                        % 2 codewords (I and Q) per frame
+        nBitsPost  = nBitsPost + numel(ampI_bits) + numel(ampQ_bits);
+        cwErr = cwErr + (eI > 0) + (eQ > 0);
+        nCw   = nCw + 2;
+
+        % --- HONEST info FER through inverse CCDM (per dimension) ---
+        infoErr = infoErr + local_ccdm_info_err(ampI_hat, infoI, nBlocks, nDM, kDM, comp, amps, amp_label);
+        infoErr = infoErr + local_ccdm_info_err(ampQ_hat, infoQ, nBlocks, nDM, kDM, comp, amps, amp_label);
+        nInfoCw = nInfoCw + 2;
 
         if cwErr >= targetCwErr, break; end
     end
 
-    bpre = bitErrPre / nBitsPre;  bpost = bitErrPost / nBitsPost;  bl = cwErr / nCw;
-    berPre(p)  = bpre;
-    berPost(p) = bpost;
-    bler(p)    = bl;
-    fprintf(['SNR=%4.1f dB | BERpre=%.3e | BERpost=%.3e | BLER=%.3e ' ...
-             '(%d/%d codewords, %d frames, %.1fs)\n'], ...
-             snr, bpre, bpost, bl, cwErr, nCw, nCw/2, toc(t0));
+    berPre(p)  = bitErrPre / nBitsPre;
+    berPost(p) = bitErrPost / nBitsPost;
+    bler(p)    = cwErr / nCw;
+    ferInfo(p) = infoErr / nInfoCw;
+    fprintf(['SNR=%4.1f dB | BERpre=%.3e | BERpost=%.3e | BLER=%.3e | ' ...
+             'FERinfo=%.3e (%d cw, %.1fs)\n'], ...
+             snr, berPre(p), berPost(p), bler(p), ferInfo(p), nCw, toc(t0));
 end
-%%
 
 % ---------------- Results ----------------
-T = table(SNR_dB.', berPre.', berPost.', bler.', ...
-          'VariableNames', {'SNR_dB','BER_pre','BER_post','BLER'});
+T = table(SNR_dB.', berPre.', berPost.', bler.', ferInfo.', ...
+          'VariableNames', {'SNR_dB','BER_pre','BER_post','BLER','FER_info'});
 disp(T);
 
-figure('Name','PAS 64-QAM FEC sweep','Color','w');
-berPostPlot = berPost; berPostPlot(berPostPlot==0) = NaN;   % avoid log(0)
-blerPlot    = bler;    blerPlot(blerPlot==0)       = NaN;
-semilogy(SNR_dB, berPre, '-o', SNR_dB, berPostPlot, '-s', ...
-         SNR_dB, blerPlot, '-^', 'LineWidth', 1.3); grid on;
+figure('Name','PAS 64-QAM real-CCDM sweep','Color','w');
+bpp = berPost; bpp(bpp==0)=NaN;
+blp = bler;    blp(blp==0)=NaN;
+fip = ferInfo; fip(fip==0)=NaN;
+semilogy(SNR_dB, berPre, '-o', SNR_dB, bpp, '-s', ...
+         SNR_dB, blp, '-^', SNR_dB, fip, '-d', 'LineWidth', 1.3); grid on;
 xlabel('SNR [dB]'); ylabel('error rate');
-legend('BER pre-FEC','BER post-FEC','BLER','Location','southwest');
-title(sprintf('PAS 64-QAM, %s, \\nu=%.2g', cfg.code, nu));
+legend('BER pre-FEC','BER post-FEC','BLER','FER info (CCDM)','Location','southwest');
+title(sprintf('PAS 64-QAM real CCDM, %s, \\nu=%.2g', cfg.code, nu));
 
-% ---------------- Shaping statistics (example frame) ----------------
-if ~isempty(x_ex)
-    S = src.stats(x_ex, cstll, pA, amps);
-end
+save('results/pas64qam_realccdm.mat','SNR_dB','berPre','berPost','bler','ferInfo','cfg','nu','ccdm');
+fprintf('Saved results/pas64qam_realccdm.mat\n');
 
-
-%%
-%% 16-ASK PAS -- DVB-S2 3/4, comparacion Fig. 4.10b
-clear; rng(7);
-
-m       = 4;
-nu      = 0.0145;                    % H(A)≈2.55
-SNR_dB  = 15:0.25:18;
-maxFrames   = 3000;
-targetCwErr = 50;
-maxLDPCIter = 50;
-
-cstll = pro.dig_mod_ASK(m, "gray");
-[amp_label, amps] = pro.get_amplitude_label(cstll);
-[pA,px,~] = pro.build_shaping(nu, cstll, amps);
-cstll.px  = px;
-fprintf('H(A) = %.4f bpcu\n', -sum(pA(pA>0).*log2(pA(pA>0))));
-
-cfg = fec.pas_config(m, 'dvbs2-3/4');
-n   = cfg.n;
-fprintf('FEC: %s | N=%d K=%d Rc=%.4f | n=%d\n', cfg.name, cfg.N, cfg.K, cfg.Rc, n);
-
-nPts = numel(SNR_dB);
-berPre = nan(1,nPts); berPost = nan(1,nPts); fer = nan(1,nPts);
-
-pool = gcp('nocreate'); if isempty(pool), parpool(6); end
-
-parfor p = 1:nPts
-    snr = SNR_dB(p);
-    bitErrPre=0; nBitsPre=0; bitErrPost=0; nBitsPost=0; cwErr=0; nCw=0;
-    t0=tic;
-    for f = 1:maxFrames
-        amp  = pro.draw_amplitude_bits(n, pA, amp_label);   % (n,m-1)
-        bits = fec.encode(amp, cfg);                        % (n,m)=[sign,amp]
-        x    = pro.map(bits, cstll);                        % (n,1) REAL
-
-        [y, sigma2] = channel.real_channel(x, snr, n);      % REAL, sigma2 completo
-        llr = pro.demap(y, cstll, sigma2, 'SD');            % sigma2 COMPLETO
-
-        hd = uint8(llr < 0);
-        bitErrPre = bitErrPre + sum(hd(:) ~= uint8(bits(:)));
-        nBitsPre  = nBitsPre + numel(bits);
-
-        amp_hat = fec.decode(llr, cfg, maxLDPCIter);
-        e = sum(amp_hat(:) ~= amp(:));
-        bitErrPost = bitErrPost + e;
-        nBitsPost  = nBitsPost + numel(amp);
-        cwErr = cwErr + (e>0); nCw = nCw + 1;
-        if cwErr >= targetCwErr, break; end
+% ======================================================================
+%  Helpers (chain-specific: match your amp_label convention)
+% ======================================================================
+function [amp_bits, info] = local_ccdm_tx(nBlocks, nDM, kDM, comp, amps, amp_label, m)
+% Generate one real-dimension frame via REAL CCDM. Returns amp_bits (n x m-1)
+% and the info bits (nBlocks x kDM) for the genie ACK.
+    info   = randi([0 1], nBlocks, kDM);
+    ampSeq = zeros(nBlocks*nDM, 1);
+    for b = 1:nBlocks
+        aBlk = pro.ccdm_encode_mex(info(b,:), comp, amps);
+        ampSeq((b-1)*nDM + (1:nDM)) = aBlk(:);
     end
-    berPre(p)=bitErrPre/nBitsPre; berPost(p)=bitErrPost/nBitsPost; fer(p)=cwErr/nCw;
-    fprintf('SNR=%4.1f | BERpre=%.2e | FER=%.2e (%d/%d, %.1fs)\n', ...
-            snr, berPre(p), fer(p), cwErr, nCw, toc(t0));
+    [tf, loc] = ismember(ampSeq, amps);
+    assert(all(tf));
+    amp_bits = amp_label(loc, :);            % (n x m-1)
 end
 
-figure('Color','w');
-ferPlot=fer; ferPlot(ferPlot==0)=NaN;
-semilogy(SNR_dB, ferPlot, '-o','LineWidth',1.3,'Color',[0 0.45 0.85]); grid on;
-xlabel('SNR [dB]'); ylabel('FER'); ylim([1e-5 1]);
-legend('16-ASK PAS, DVB-S2 3/4','Location','southwest');
-title('16-ASK PAS, R_{tx}≈2.5 bpcu (regimen Fig. 4.10b)');
-
+function e = local_ccdm_info_err(amp_hat, info, nBlocks, nDM, kDM, comp, amps, amp_label)
+% Returns 1 if ANY info block fails after inverse CCDM, else 0 (info FER).
+    n = size(amp_hat,1);
+    ampHat = zeros(1,n);
+    for j = 1:n
+        [tf, loc] = ismember(amp_hat(j,:), amp_label, 'rows');
+        if tf, ampHat(j) = amps(loc); else, e = 1; return; end
+    end
+    for b = 1:nBlocks
+        seg = ampHat((b-1)*nDM + (1:nDM));
+        % invalid composition -> undecodable -> info error
+        ok = true;
+        for i = 1:numel(amps)
+            if sum(seg==amps(i)) ~= comp(i), ok=false; break; end
+        end
+        if ~ok, e = 1; return; end
+        ib = pro.ccdm_decode_mex(seg, comp, amps, kDM);
+        if ~isequal(ib, info(b,:)), e = 1; return; end
+    end
+    e = 0;
+end
