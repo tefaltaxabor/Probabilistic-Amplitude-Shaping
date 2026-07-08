@@ -1,30 +1,23 @@
-/* ccdm_decode_mex.c
+/* ccdm_decode_mex.c  (OPTIMIZED -- incremental multinomial caching)
  *
- * CCDM decoder (ranking) with GMP big integers.  Exact inverse of
- * ccdm_encode_mex: maps a constant-composition amplitude sequence of length n
- * back to its k input bits.  Bocherer, "Probabilistic Amplitude Shaping"
- * (2023), Section 2.5.
+ * CCDM decoder (ranking), exact inverse of ccdm_encode_mex. Uses the same
+ * incremental multinomial identity so the per-position work is O(M) big-int
+ * mul/div instead of O(M^2) binomials.
  *
- * MATLAB call:
- *     bits = ccdm_decode_mex(a, comp, amps, k)
+ *   At each position with remaining composition rem (total = sum rem) and
+ *   cached N = N(rem): the rank contribution of symbol s is sum over t<s of
+ *   N_t = N * rem[t] / total. After consuming the actual symbol s, update
+ *   N <- N * rem[s] / total, total -= 1, rem[s] -= 1.
  *
- *   a    : (1 x n) double row, amplitude sequence from ccdm_encode_mex
- *   comp : (1 x M) double row, integer composition [n_1..n_M]
- *   amps : (1 x M) double row, amplitude alphabet
- *   k    : scalar, number of output bits (= floor(log2 |T^n(P)|))
- *   bits : (1 x k) double row, recovered input bits, MSB first
- *
- * Build:
- *     mex -lgmp ccdm_decode_mex.c
- *
+ * MATLAB call:  bits = ccdm_decode_mex(a, comp, amps, k)
+ * Build:        mex -lgmp ccdm_decode_mex.c
  * Gabriel Cabrera -- PAS + HARQ thesis.
  */
 
 #include "mex.h"
 #include <gmp.h>
-#include <string.h>
 
-static void multinomial(mpz_t res, const long *counts, int M)
+static void multinomial_full(mpz_t res, const long *counts, int M)
 {
     long total = 0;
     for (int i = 0; i < M; ++i) total += counts[i];
@@ -55,9 +48,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
     int  M = (int)mxGetNumberOfElements(prhs[1]);
 
     long *rem = (long*)mxMalloc(M * sizeof(long));
-    for (int i = 0; i < M; ++i) rem[i] = (long)compd[i];
+    long total = 0;
+    for (int i = 0; i < M; ++i) { rem[i] = (long)compd[i]; total += rem[i]; }
 
-    /* map each amplitude value to its symbol index 0..M-1 */
+    /* map amplitude values -> symbol indices */
     int *symIdx = (int*)mxMalloc(n * sizeof(int));
     for (long pos = 0; pos < n; ++pos) {
         int found = -1;
@@ -70,35 +64,35 @@ void mexFunction(int nlhs, mxArray *plhs[],
         symIdx[pos] = found;
     }
 
-    mpz_t idx, term;
-    mpz_init(idx); mpz_init(term);
+    mpz_t idx, N, Nt, tmp;
+    mpz_init(idx); mpz_init(N); mpz_init(Nt); mpz_init(tmp);
     mpz_set_ui(idx, 0);
 
-    long *remT = (long*)mxMalloc(M * sizeof(long));
+    multinomial_full(N, rem, M);           /* initial N(rem), ONCE */
 
     for (long pos = 0; pos < n; ++pos) {
         int s = symIdx[pos];
-        /* add blocks of all symbols t < s still available */
+        /* add N_t = N*rem[t]/total for all t < s (still available) */
         for (int t = 0; t < s; ++t) {
             if (rem[t] == 0) continue;
-            memcpy(remT, rem, M * sizeof(long));
-            remT[t] -= 1;
-            multinomial(term, remT, M);
-            mpz_add(idx, idx, term);
+            mpz_mul_ui(tmp, N, (unsigned long)rem[t]);
+            mpz_divexact_ui(Nt, tmp, (unsigned long)total);
+            mpz_add(idx, idx, Nt);
         }
+        /* update N for next position: N <- N*rem[s]/total */
+        mpz_mul_ui(tmp, N, (unsigned long)rem[s]);
+        mpz_divexact_ui(N, tmp, (unsigned long)total);
         rem[s] -= 1;
+        total  -= 1;
     }
 
-    /* expand idx to k bits, MSB first */
+    /* expand idx to k bits, MSB first: bits[b] = bit (k-1-b) of idx */
     plhs[0] = mxCreateDoubleMatrix(1, (mwSize)k, mxREAL);
     double *bits = mxGetPr(plhs[0]);
-    for (long b = k - 1; b >= 0; --b) {
+    for (long b = 0; b < k; ++b) {
         bits[b] = (double)mpz_tstbit(idx, (mp_bitcnt_t)(k - 1 - b));
     }
-    /* note: tstbit(idx, j) gives bit j (LSB=0). We want MSB-first output:
-     * bits[0] is the MSB = bit (k-1). The loop above writes bits[b] using
-     * tstbit(k-1-b); for b=0 -> tstbit(k-1) = MSB. Correct. */
 
-    mpz_clear(idx); mpz_clear(term);
-    mxFree(rem); mxFree(symIdx); mxFree(remT);
+    mpz_clear(idx); mpz_clear(N); mpz_clear(Nt); mpz_clear(tmp);
+    mxFree(rem); mxFree(symIdx);
 }

@@ -17,11 +17,11 @@ clear; rng(7);
 % ---------------- Parameters ----------------
 m       = 3;
 nu      = 0.05;
-SNR_dB  = 6:0.3:15;
+SNR_dB      = 9:0.3:13; 
 
-maxFrames   = 2e4;
+maxFrames   = 5000;
 targetCwErr = 40;
-maxLDPCIter = 20;
+maxLDPCIter = 12;
 
 % ---------------- Constellation and shaping ----------------
 cstll = pro.dig_mod_ASK(m, "gray");
@@ -185,3 +185,32 @@ function e = info_err_fast(amp_hat, amp_bits_tx, info, nBitErr, ...
     end
     e = 0;
 end
+%%
+% un frame, cronometrando cada etapa
+snr = 11;  % punto de la waterfall
+
+tic; 
+[ampI_bits, infoI] = tx_ccdm(nBlocks, nDM, kDM, comp, amps, amp2idx, amp_label);
+[ampQ_bits, infoQ] = tx_ccdm(nBlocks, nDM, kDM, comp, amps, amp2idx, amp_label);
+t_tx = toc;
+
+tic;
+bitsI = fec.encode(ampI_bits, cfg);
+bitsQ = fec.encode(ampQ_bits, cfg);
+t_enc = toc;
+
+tic;
+xI = pro.map(bitsI, cstll); xQ = pro.map(bitsQ, cstll);
+x = xI + 1j*xQ;
+[y, sigma2] = channel.complex_channel(x, snr, n);
+llrI = pro.demap(real(y), cstll, sigma2/2, 'SD');
+llrQ = pro.demap(imag(y), cstll, sigma2/2, 'SD');
+t_demap = toc;
+
+tic;
+ampI_hat = fec.decode(llrI, cfg, maxLDPCIter);
+ampQ_hat = fec.decode(llrQ, cfg, maxLDPCIter);
+t_dec = toc;
+
+fprintf('TX(CCDM)=%.3fs | encode=%.3fs | map+demap=%.3fs | LDPC decode=%.3fs\n', ...
+        t_tx, t_enc, t_demap, t_dec);

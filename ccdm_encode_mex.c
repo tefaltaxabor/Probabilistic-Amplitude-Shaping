@@ -1,47 +1,34 @@
-/* ccdm_encode_mex.c
+/* ccdm_encode_mex.c  (OPTIMIZED -- incremental multinomial caching)
  *
- * CCDM encoder (unranking) with GMP big integers.  Maps k input bits to a
- * constant-composition amplitude sequence of length n, following Bocherer,
- * "Probabilistic Amplitude Shaping" (2023), Section 2.5.
+ * CCDM encoder (unranking) with GMP big integers. Same exact, invertible map
+ * as the original (Bocherer 2023, Sec. 2.5), but the per-position multinomial
+ * is UPDATED in O(M) big-int mul/div instead of recomputed from scratch in
+ * O(M^2) binomials. This removes the ~262 s that ccdm_encode_mex cost in the
+ * 64-QAM sweep profiler (4.9M calls).
  *
- * The index (k bits) is a big integer; multinomial coefficients are exact
- * big integers.  Using GMP removes the 2^53 double-precision limit of a
- * pure-MATLAB implementation, so n = 200 (or larger) is exact.
+ * Exact identity (integer arithmetic):
+ *   N(rem) = (sum rem)! / prod(rem_i!).  Sequences starting with s:
+ *   N_s = N(rem) * rem[s] / total,  total = sum rem.  After choosing s:
+ *   N(rem with s decremented) = N_s, total -= 1.  Division is exact
+ *   (mpz_divexact_ui) -> bit-identical to the scratch computation.
  *
- * MATLAB call:
- *     a = ccdm_encode_mex(bits, comp, amps)
- *
- *   bits : (1 x k) double/logical row, values in {0,1}, MSB first
- *   comp : (1 x M) double row, integer composition [n_1..n_M], sum(comp)=n
- *   amps : (1 x M) double row, amplitude alphabet values
- *   a    : (1 x n) double row, amplitude sequence with exact composition comp
- *
- * Build (on your machine, with libgmp-dev installed):
- *     mex -lgmp ccdm_encode_mex.c
- *
+ * MATLAB call:  a = ccdm_encode_mex(bits, comp, amps)
+ * Build:        mex -lgmp ccdm_encode_mex.c
  * Gabriel Cabrera -- PAS + HARQ thesis.
  */
 
 #include "mex.h"
 #include <gmp.h>
-#include <string.h>
 
-/* multinomial( counts, M ) = (sum counts)! / prod(counts_i!), exact, into res */
-static void multinomial(mpz_t res, const long *counts, int M)
+/* full multinomial -- used ONCE for the initial N(rem) */
+static void multinomial_full(mpz_t res, const long *counts, int M)
 {
     long total = 0;
     for (int i = 0; i < M; ++i) total += counts[i];
-
-    /* res = total! / (c_0! c_1! ... c_{M-1}!) built as a product of binomials:
-     *   multinom = C(total, c_0) * C(total-c_0, c_1) * ...
-     * which keeps intermediate values smaller than computing total! directly. */
-    mpz_t binom;
-    mpz_init(binom);
+    mpz_t binom; mpz_init(binom);
     mpz_set_ui(res, 1);
-
     long running = total;
     for (int i = 0; i < M; ++i) {
-        /* binom = C(running, counts[i]) */
         mpz_bin_uiui(binom, (unsigned long)running, (unsigned long)counts[i]);
         mpz_mul(res, res, binom);
         running -= counts[i];
@@ -56,49 +43,48 @@ void mexFunction(int nlhs, mxArray *plhs[],
         mexErrMsgIdAndTxt("ccdm:encode:nargin",
                           "Usage: a = ccdm_encode_mex(bits, comp, amps)");
 
-    const double *bits = mxGetPr(prhs[0]);
+    const double *bits  = mxGetPr(prhs[0]);
     const double *compd = mxGetPr(prhs[1]);
-    const double *amps = mxGetPr(prhs[2]);
+    const double *amps  = mxGetPr(prhs[2]);
 
     mwSize k = mxGetNumberOfElements(prhs[0]);
     int    M = (int)mxGetNumberOfElements(prhs[1]);
     if ((int)mxGetNumberOfElements(prhs[2]) != M)
         mexErrMsgIdAndTxt("ccdm:encode:dim", "comp and amps must have equal length");
 
-    /* remaining composition as long[] */
     long *rem = (long*)mxMalloc(M * sizeof(long));
-    long n = 0;
-    for (int i = 0; i < M; ++i) { rem[i] = (long)compd[i]; n += rem[i]; }
+    long total = 0;
+    for (int i = 0; i < M; ++i) { rem[i] = (long)compd[i]; total += rem[i]; }
+    long n = total;
 
-    /* idx = integer value of the k bits (MSB first) */
-    mpz_t idx, acc, Ns;
-    mpz_init(idx); mpz_init(acc); mpz_init(Ns);
+    mpz_t idx, acc, Ns, N, tmp;
+    mpz_init(idx); mpz_init(acc); mpz_init(Ns); mpz_init(N); mpz_init(tmp);
     mpz_set_ui(idx, 0);
     for (mwSize b = 0; b < k; ++b) {
-        mpz_mul_2exp(idx, idx, 1);                 /* idx <<= 1 */
+        mpz_mul_2exp(idx, idx, 1);
         if (bits[b] != 0.0) mpz_add_ui(idx, idx, 1);
     }
 
-    /* output */
     plhs[0] = mxCreateDoubleMatrix(1, (mwSize)n, mxREAL);
     double *a = mxGetPr(plhs[0]);
 
-    long *remS = (long*)mxMalloc(M * sizeof(long));
+    multinomial_full(N, rem, M);           /* initial N(rem), ONCE */
 
     for (long pos = 0; pos < n; ++pos) {
         mpz_set_ui(acc, 0);
         int chosen = -1;
         for (int s = 0; s < M; ++s) {
             if (rem[s] == 0) continue;
-            memcpy(remS, rem, M * sizeof(long));
-            remS[s] -= 1;
-            multinomial(Ns, remS, M);              /* # sequences starting with s */
-            /* if idx < acc + Ns  -> choose s */
-            mpz_add(acc, acc, Ns);                 /* acc now = previous acc + Ns */
+            /* Ns = N * rem[s] / total   (exact) */
+            mpz_mul_ui(tmp, N, (unsigned long)rem[s]);
+            mpz_divexact_ui(Ns, tmp, (unsigned long)total);
+            mpz_add(acc, acc, Ns);
             if (mpz_cmp(idx, acc) < 0) {
-                /* idx -= (acc - Ns) = previous acc */
-                mpz_sub(acc, acc, Ns);             /* restore acc to block start */
+                mpz_sub(acc, acc, Ns);     /* acc = block start */
                 mpz_sub(idx, idx, acc);
+                mpz_set(N, Ns);            /* N for next position */
+                rem[s] -= 1;
+                total  -= 1;
                 chosen = s;
                 break;
             }
@@ -107,9 +93,9 @@ void mexFunction(int nlhs, mxArray *plhs[],
             mexErrMsgIdAndTxt("ccdm:encode:range",
                               "index out of range: bits exceed |T^n(P)|");
         a[pos] = amps[chosen];
-        rem[chosen] -= 1;
     }
 
     mpz_clear(idx); mpz_clear(acc); mpz_clear(Ns);
-    mxFree(rem); mxFree(remS);
+    mpz_clear(N);   mpz_clear(tmp);
+    mxFree(rem);
 }

@@ -23,7 +23,7 @@ function [amp_hat, nIter, ok] = decode(llrs_sym, cfg, maxIter)
     info_llr = reshape(amp_llr.', [], 1);      % (K,1) same order as encode
     cw_llr   = [info_llr; sign_llr];           % (N,1) = [info; parity]
 
-    [dec, nIter, pcheck] = ldpcDecode(cw_llr, cfg.dec, maxIter);
+    [dec, nIter, pcheck] = ldpcDecode(cw_llr, cfg.dec, maxIter,"DecisionType","hard");
 
     amp_hat = uint8(reshape(dec, cfg.m-1, cfg.n).');   % (n, m-1)
     ok      = all(pcheck == 0);
