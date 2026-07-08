@@ -2,7 +2,7 @@ function out = run_point(snr, cfg, cstll, pA, amp_label, sch, maxFrames, targetC
 % RUN_POINT  Monte-Carlo of one SNR point for a HARQ chain over PAS.
 %
 %   out = harq.run_point(snr, cfg, cstll, pA, amp_label, sch, ...
-%                        maxFrames, targetCwErr, maxIter)
+%                        maxFrames, targetCwErr, maxIter)   
 %
 %   Simulates one real-dimension PAS codeword per frame under HARQ. The SAME
 %   loop serves BOTH strategies: 'IR' and 'CC' differ only through the transmit
@@ -22,12 +22,12 @@ function out = run_point(snr, cfg, cstll, pA, amp_label, sch, maxFrames, targetC
 %     nCw       : codewords simulated
 %     nFail     : codewords still in error after maxTx rounds
 
-    if nargin < 9, maxIter = 50; end
+    if nargin < 9, maxIter = 20; end
 
     maxTx  = sch.maxTx;
     txSets = sch.txSets;
     n      = cfg.n;
-    K      = cfg.K;                     % info (systematic amplitude) bits / codeword
+    K      = cfg.K;                     
 
     succCount    = zeros(1, maxTx);     % codewords first decoded at round r
     nFail        = 0;
@@ -75,7 +75,11 @@ function out = run_point(snr, cfg, cstll, pA, amp_label, sch, maxFrames, targetC
         end
         sumUsed = sumUsed + usedSyms;
 
-        if nFail >= targetCwErr, break; end
+        % corta si juntaste suficientes fallos finales, O si ya viste
+        % suficientes codewords que necesitaron retransmisión (estadística de rondas)
+        nRetx = nCw - succCount(1);   % codewords que NO decodificaron en ronda 1
+        if nFail >= targetCwErr || nRetx >= 200, break; end
+
     end
 
     % Residual BLER after each round = 1 - (cumulative first-successes)/nCw.

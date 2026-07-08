@@ -19,7 +19,7 @@
 % encontrar el benchmark para comparar
 
 %%
-´% BCM, information theoreticals comparison.
+% BCM, information theoreticals comparison.
 clear; rng(7);
 
 % ---------------- Parameters ----------------
@@ -199,10 +199,3 @@ xlabel('SNR [dB]'); ylabel('FER'); ylim([1e-5 1]);
 legend('16-ASK PAS, DVB-S2 3/4','Location','southwest');
 title('16-ASK PAS, R_{tx}≈2.5 bpcu (regimen Fig. 4.10b)');
 
-%%
-a = zeros(1,5);
-for i = 1:5
-    a(1,i) = 1j*exp(1j*((2*i-1)/10)*pi);
-end
-
-a

@@ -21,4 +21,10 @@ function [bits_sym, cw] = encode(amp_bits, cfg)
 
     parity   = cw(cfg.K+1:end);                  % (n,1) -> sign bits
     bits_sym = [parity, double(amp_bits)];       % (n, m): [sign, amplitude]
+
 end
+
+
+
+
+

@@ -7,7 +7,15 @@
 %     harqMode = 'IR'  -> incremental redundancy (reveal new symbols per round)
 %     harqMode = 'CC'  -> Chase combining        (repeat + LLR-combine each round)
 %
-%  Metrics per the thesis plan: BLER per HARQ round and normalized throughput.
+%  Metrics per the thesis plan: BLER per HARQ round and 
+
+%  normalized throughput.
+
+%  Chase Combining (PAS) vs IR (Uniform) ; ( CC(IR) - for my self )
+
+%  IR(GES) vs IR(5G LDPC Uniform)
+ 
+% 
 clear; rng(7);
 
 % ================= HARQ SELECTOR (change this line only) =================
@@ -23,11 +31,11 @@ punctureFrac = 0.25;        % symbols hidden at round 1 (higher initial rate).
 % ---------------- Link parameters ----------------
 m       = 3;                % 8-ASK per dimension (64-QAM)
 nu      = 0.05;             % Maxwell-Boltzmann shaping parameter
-SNR_dB  = 4:0.5:14;
+SNR_dB  = 15.8:0.2:17.4;
 
-maxFrames   = 20000;
-targetCwErr = 40;           % residual codeword errors (after maxTx) to accumulate
-maxLDPCIter = 50;
+maxFrames   = 3e4;
+targetCwErr = 100;           
+maxLDPCIter = 25;
 
 % ---------------- Constellation and shaping ----------------
 cstll = pro.dig_mod_ASK(m, "gray");
@@ -54,14 +62,14 @@ end
 
 % ---------------- Sweep ----------------
 nPts     = numel(SNR_dB);
-blerAll  = nan(nPts, maxTx);       % residual BLER after each round
+blerAll  = nan(nPts, maxTx);      
 thr      = nan(1, nPts);
 succRate = nan(1, nPts);
 avgTx    = nan(1, nPts);
 
-pool = gcp('nocreate'); if isempty(pool), parpool(6); end
+%pool = gcp('nocreate'); if isempty(pool), parpool(6); end
 
-parfor p = 1:nPts
+for p = 1:nPts
     snr = SNR_dB(p);
     t0  = tic;
     out = harq.run_point(snr, cfg, cstll, pA, amp_label, sch, ...
@@ -96,10 +104,12 @@ xlabel('SNR [dB]'); ylabel('throughput [info bits / symbol]');
 title(sprintf('Normalized throughput, HARQ %s', sch.mode));
 
 % ---------------- Save (results/) ----------------
-stamp   = sprintf('harq_%s_m%d_maxTx%d', lower(char(sch.mode)), m, maxTx);
+stamp   = sprintf('harq_%s_m%d_maxTx%d_CC', lower(char(sch.mode)), m, maxTx);
 outfile = fullfile('results', stamp);
 save([outfile '.mat'], 'SNR_dB', 'blerAll', 'thr', 'succRate', 'avgTx', ...
                        'sch', 'cfg', 'nu', 'harqMode');
 savefig(fig1, [outfile '_bler.fig']);
 savefig(fig2, [outfile '_thr.fig']);
 fprintf('Saved results to %s.{mat,fig}\n', outfile);
+%%
+
