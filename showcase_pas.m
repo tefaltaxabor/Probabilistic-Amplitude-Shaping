@@ -98,22 +98,29 @@ function panel1_rateloss(ctx)
     nNu   = numel(o.nus);   nN = numel(nGrid);
 
     Rdm    = nan(nNu, nN);   % k/n, what a real CCDM delivers
-    Ltot   = nan(nNu, nN);   % H(A) - k/n            (eq. 23, total loss)
-    Lquant = nan(nNu, nN);   % H(A) - H(p^(n))       (quantisation of the type)
-    Lint   = nan(nNu, nN);   % H(p^(n)) - k/n        (integrality of log2|T|)
-    Dtype  = nan(nNu, nN);   % D(p^(n) || p_A)       (eq. 24)
+    Ltot   = nan(nNu, nN);   % H(A) - k/n        total loss (write-up def.)
+    Lquant = nan(nNu, nN);   % H(A) - H(p^(n))   quantisation part (SIGNED)
+    Lint   = nan(nNu, nN);   % H(p^(n)) - k/n    integrality part
+    Dtype  = nan(nNu, nN);   % D(p^(n) || p_A)   single-letter divergence
+    Dseq   = nan(nNu, nN);   % (1/n) D(P_A || p_A^{x n})  sequence divergence
     HA     = nan(1, nNu);
+
+    % Stirling asymptote of the CCDM rate loss:
+    %   log2|T^n(P)| = n H(p^(n)) - (K-1)/2 log2(n) + O(1)
+    % This -- not the single-letter divergence -- is what R_loss follows.
+    K   = numel(ctx.amps);
+    law = (K-1) ./ (2*nGrid) .* log2(nGrid);
 
     for i = 1:nNu
         [pA, ~, HA(i)] = pro.build_shaping(o.nus(i), ctx.cstll, ctx.amps);
         for j = 1:nN
             cc = pro.ccdm_init(pA, ctx.amps, nGrid(j));
             Rdm(i,j)    = cc.Rccdm;
-            Ltot(i,j)   = HA(i) - cc.Rccdm;
-            Lquant(i,j) = HA(i) - cc.Hbar;
-            Lint(i,j)   = cc.Rloss;              % = Hbar - Rccdm
-            q           = cc.pQuant;  k = q > 0;
-            Dtype(i,j)  = sum(q(k) .* log2(q(k) ./ pA(k)));
+            Ltot(i,j)   = cc.Rloss;          % H(A) - k/n
+            Lquant(i,j) = cc.Rloss_quant;
+            Lint(i,j)   = cc.Rloss_int;
+            Dtype(i,j)  = cc.Dtype;
+            Dseq(i,j)   = cc.Dseq;
         end
         fprintf('  nu=%.3f  H(A)=%.4f | R_dm(n=%d)=%.4f  R_loss=%.4f\n', ...
                 o.nus(i), HA(i), o.nDM, ...
@@ -144,29 +151,52 @@ function panel1_rateloss(ctx)
         loglog(ax, nGrid, max(Ltot(i,:), eps), '-', 'Color', co(i,:), ...
                'LineWidth', 1.4, 'DisplayName', sprintf('\\nu=%.3g', o.nus(i)));
     end
+    loglog(ax, nGrid, law, '--k', 'LineWidth', 1.8, ...
+           'DisplayName','(K-1)log_2(n)/(2n)');
     xline(ax, o.nDM, ':k', 'HandleVisibility','off');
     xlabel(ax,'CCDM block length n'); ylabel(ax,'R_{loss} = H(A) - R_{dm}');
     title(ax,'(b) finite-length rate loss');
+    subtitle(ax,'dashed: Stirling asymptote, independent of \nu');
     legend(ax,'Location','southwest');
 
     % (c) decomposition at the operating nu
     [~, i0] = min(abs(o.nus - o.nu0));
     ax = nexttile(tl); hold(ax,'on'); grid(ax,'on');
     set(ax,'XScale','log','YScale','log');
-    loglog(ax, nGrid, max(Ltot(i0,:),eps),   '-k',  'LineWidth',1.6, 'DisplayName','total  H(A)-k/n');
-    loglog(ax, nGrid, max(Lquant(i0,:),eps), '-o',  'LineWidth',1.1, 'MarkerSize',3, 'DisplayName','quantisation  H(A)-H(p^{(n)})');
-    loglog(ax, nGrid, max(Lint(i0,:),eps),   '-s',  'LineWidth',1.1, 'MarkerSize',3, 'DisplayName','integrality  H(p^{(n)})-k/n');
-    loglog(ax, nGrid, max(Dtype(i0,:),eps),  '--',  'LineWidth',1.4, 'DisplayName','D(p^{(n)} || p_A)   (eq. 24)');
+    % Ltot and Lint are non-negative by construction (k = floor(log2|T|) <=
+    % n*H(p^(n))), but the quantisation term H(A)-H(p^(n)) CHANGES SIGN: the
+    % n-type is not obliged to lose entropy, and for some n it has more than
+    % p_A. Plotting max(.,eps) on a log axis would silently floor those points,
+    % so |.| is drawn and negative samples get open markers.
+    loglog(ax, nGrid, Ltot(i0,:), '-k', 'LineWidth',1.6, ...
+           'DisplayName','total  H(A)-k/n');
+    loglog(ax, nGrid, Lint(i0,:), '-s', 'LineWidth',1.1, 'MarkerSize',3, ...
+           'DisplayName','integrality  H(p^{(n)})-k/n');
+    loglog(ax, nGrid, Dseq(i0,:), '--', 'LineWidth',1.5, ...
+           'DisplayName','(1/n) D(P_A || p_A^{\otimes n})   -> R_{loss}');
+    loglog(ax, nGrid, Dtype(i0,:), ':', 'LineWidth',1.5, ...
+           'DisplayName','D(p^{(n)} || p_A)   single-letter, O(n^{-2})');
+
+    lq  = Lquant(i0,:);
+    neg = lq < 0;
+    hq  = loglog(ax, nGrid, abs(lq), '-', 'LineWidth',1.1, ...
+                 'DisplayName','|quantisation|  |H(A)-H(p^{(n)})|');
+    cq  = get(hq, 'Color');
+    plot(ax, nGrid(~neg), abs(lq(~neg)), 'o', 'Color',cq, ...
+         'MarkerFaceColor',cq,  'MarkerSize',4, 'HandleVisibility','off');
+    plot(ax, nGrid(neg),  abs(lq(neg)),  'o', 'Color',cq, ...
+         'MarkerFaceColor','w', 'MarkerSize',4, 'HandleVisibility','off');
     xline(ax, o.nDM, ':k', 'HandleVisibility','off');
     xlabel(ax,'CCDM block length n'); ylabel(ax,'bits/amplitude');
     title(ax, sprintf('(c) decomposition, \\nu=%.3g', o.nus(i0)));
+    subtitle(ax, 'open markers: H(p^{(n)}) > H(A), i.e. negative term');
     legend(ax,'Location','southwest');
 
     title(tl, sprintf('Finite-length CCDM: rate and rate loss (%d-ASK)', 2^ctx.opts.m));
 
     data = struct('nGrid',nGrid, 'nus',o.nus, 'HA',HA, 'Rdm',Rdm, ...
-                  'Ltot',Ltot, 'Lquant',Lquant, 'Lint',Lint, 'Dtype',Dtype, ...
-                  'nDM',o.nDM);
+                  'Ltot',Ltot, 'Lquant',Lquant, 'Lint',Lint, ...
+                  'Dtype',Dtype, 'Dseq',Dseq, 'law',law, 'nDM',o.nDM);
     src.save_result(fig, 'pas_ccdm_rateloss', o.outdir, data);
     close(fig);
 end
@@ -187,7 +217,9 @@ function panel2_validation(ctx)
     comp   = pro.build_composition(n, pA);
     pCC    = histcounts(comp, -0.5:1:(numel(pA)-0.5)) / n;
 
-    % (ii) the VD-optimal type used by pro.ccdm_init (Bocherer Alg. 2.5.4)
+    % (ii) the same quantiser at the MATCHER block length nDM (shorter block
+    %      -> coarser type). Since pro.build_composition now shares
+    %      pro.quantize_composition, (i) and (ii) differ only through n.
     ccdm   = pro.ccdm_init(pA, ctx.amps, o.nDM);
     pVD    = ccdm.pQuant;
 
@@ -201,7 +233,7 @@ function panel2_validation(ctx)
     dv = @(p) sum(p(p>0) .* log2(p(p>0) ./ pA(p>0)));
     fprintf('  H(A) = %.4f bits/amplitude\n', HA);
     fprintf('  D(p_CC^(n=%d)  || p_A) = %.3e   (constant composition, what the code does)\n', n, dv(pCC));
-    fprintf('  D(p_VD^(n=%d)  || p_A) = %.3e   (VD-optimal type, what ccdm_init uses)\n', o.nDM, dv(pVD));
+    fprintf('  D(p_VD^(n=%d)  || p_A) = %.3e   (same quantiser at the matcher block length)\n', o.nDM, dv(pVD));
     fprintf('  D(p_iid        || p_A) = %.3e   (i.i.d. sampler, what the text claims)\n', dv(pIID));
 
     % --- a shaped frame, for the 2D picture and the energy gain ---
