@@ -1,0 +1,139 @@
+=== inicio Wed Sep  9 20:02:39 CEST 2026 en tueilnt-sim22.ice.cit.tum.de ===
+Using Matlab's default Java.
+=== showcase_pas ===
+FEC DVB-S2 (2/3) | N=64800 K=43200 Rc=0.6667 | n=21600 symbols/dim
+CCDM block nDM=540 -> 40 blocks per codeword
+
+[1] CCDM rate loss vs block length
+  nu=0.000  H(A)=2.0000 | R_dm(n=540)=1.9741  R_loss=0.0259
+  nu=0.025  H(A)=1.8781 | R_dm(n=540)=1.8519  R_loss=0.0262
+  nu=0.050  H(A)=1.6369 | R_dm(n=540)=1.6148  R_loss=0.0221
+  nu=0.075  H(A)=1.4011 | R_dm(n=540)=1.3815  R_loss=0.0196
+  nu=0.100  H(A)=1.2053 | R_dm(n=540)=1.1833  R_loss=0.0220
+  saved -> results/pas_ccdm_rateloss.{fig,pdf,mat}
+
+[2] Fake-CCDM validation
+  H(A) = 1.6369 bits/amplitude
+  D(p_CC^(n=21600)  || p_A) = 2.010e-09   (constant composition, what the code does)
+  D(p_VD^(n=540)  || p_A) = 5.875e-06   (same quantiser at the matcher block length)
+  D(p_iid        || p_A) = 7.963e-07   (i.i.d. sampler, what the text claims)
+  E_s shaped=18.4343  uniform=42.0000  ->  energy reduction 3.58 dB
+       (at fixed d_min, NOT the shaping gain: the rate also drops from 2.000 to 1.637 bits/amplitude.
+        The shaping gain is the gap-to-capacity comparison in panel 4.)
+  P(sign>0) = 0.5010  (LDPC parity fills the signs; should be ~0.5)
+  saved -> results/pas_ccdm_validation.{fig,pdf,mat}
+
+[3] Waterfall at nu=0.05
+  [ 1/21] SNR= 8.60 | BERpre=1.160e-01 BERpost=1.132e-01 BLER=1.000e+00 (5.7s)
+  [ 2/21] SNR= 8.75 | BERpre=1.131e-01 BERpost=1.085e-01 BLER=1.000e+00 (5.5s)
+  [ 3/21] SNR= 8.90 | BERpre=1.104e-01 BERpost=1.036e-01 BLER=1.000e+00 (6.0s)
+  [ 4/21] SNR= 9.05 | BERpre=1.079e-01 BERpost=9.836e-02 BLER=1.000e+00 (7.2s)
+  [ 5/21] SNR= 9.20 | BERpre=1.051e-01 BERpost=9.287e-02 BLER=1.000e+00 (7.1s)
+  [ 6/21] SNR= 9.35 | BERpre=1.026e-01 BERpost=8.664e-02 BLER=1.000e+00 (7.0s)
+  [ 7/21] SNR= 9.50 | BERpre=1.000e-01 BERpost=7.882e-02 BLER=1.000e+00 (6.8s)
+  [ 8/21] SNR= 9.65 | BERpre=9.763e-02 BERpost=7.147e-02 BLER=1.000e+00 (6.7s)
+  [ 9/21] SNR= 9.80 | BERpre=9.478e-02 BERpost=6.071e-02 BLER=1.000e+00 (6.5s)
+  [10/21] SNR= 9.95 | BERpre=9.240e-02 BERpost=4.862e-02 BLER=1.000e+00 (6.3s)
+  [11/21] SNR=10.10 | BERpre=8.973e-02 BERpost=2.681e-02 BLER=9.878e-01 (6.3s)
+  [12/21] SNR=10.25 | BERpre=8.710e-02 BERpost=2.972e-03 BLER=4.000e-01 (13.8s)
+  [13/21] SNR=10.40 | BERpre=8.463e-02 BERpost=3.611e-06 BLER=4.750e-03 (201.8s)
+  [14/21] SNR=10.55 | BERpre=8.207e-02 BERpost=3.472e-08 BLER=7.500e-04 (160.8s)
+  [15/21] SNR=10.70 | BERpre=7.956e-02 BERpost=5.787e-08 BLER=1.250e-03 (137.0s)
+  [16/21] SNR=10.85 | BERpre=7.706e-02 BERpost=4.630e-08 BLER=1.000e-03 (121.1s)
+  [17/21] SNR=11.00 | BERpre=7.455e-02 BERpost=3.472e-08 BLER=7.500e-04 (108.9s)
+  [18/21] SNR=11.15 | BERpre=7.206e-02 BERpost=1.157e-08 BLER=2.500e-04 (100.3s)
+  [19/21] SNR=11.30 | BERpre=6.961e-02 BERpost=1.157e-08 BLER=2.500e-04 (92.2s)
+  [20/21] SNR=11.45 | BERpre=6.719e-02 BERpost=0.000e+00 BLER=0.000e+00 (86.1s)
+  [21/21] SNR=11.60 | BERpre=6.478e-02 BERpost=3.472e-08 BLER=7.500e-04 (80.7s)
+  saved -> results/pas_waterfall.{fig,pdf,mat}
+
+[4] nu sweep
+  nu=0 | H(A)=2.0000 | R_dm=1.9741 | R_2D: ideal 4.000 real 3.948
+    [ 1/13] nu=0 SNR=12.80 | BERpost=1.03e-01 BLER=1.00e+00 (7.3s)
+    [ 2/13] nu=0 SNR=12.95 | BERpost=9.42e-02 BLER=1.00e+00 (7.3s)
+    [ 3/13] nu=0 SNR=13.10 | BERpost=8.41e-02 BLER=1.00e+00 (7.1s)
+    [ 4/13] nu=0 SNR=13.25 | BERpost=6.40e-02 BLER=1.00e+00 (6.8s)
+    [ 5/13] nu=0 SNR=13.40 | BERpost=2.30e-02 BLER=7.27e-01 (8.7s)
+    [ 6/13] nu=0 SNR=13.55 | BERpost=9.81e-05 BLER=1.18e-02 (222.2s)
+    [ 7/13] nu=0 SNR=13.70 | BERpost=0.00e+00 BLER=0.00e+00 (169.4s)
+    [ 8/13] nu=0 SNR=13.85 | BERpost=0.00e+00 BLER=0.00e+00 (141.6s)
+    [ 9/13] nu=0 SNR=14.00 | BERpost=1.16e-08 BLER=2.50e-04 (123.7s)
+    [10/13] nu=0 SNR=14.15 | BERpost=0.00e+00 BLER=0.00e+00 (111.1s)
+    [11/13] nu=0 SNR=14.30 | BERpost=0.00e+00 BLER=0.00e+00 (101.4s)
+    [12/13] nu=0 SNR=14.45 | BERpost=1.16e-08 BLER=2.50e-04 (93.5s)
+    [13/13] nu=0 SNR=14.60 | BERpost=0.00e+00 BLER=0.00e+00 (87.1s)
+  nu=0.025 | H(A)=1.8781 | R_dm=1.8519 | R_2D: ideal 3.756 real 3.704
+    [ 1/13] nu=0.025 SNR=11.20 | BERpost=9.51e-02 BLER=1.00e+00 (7.3s)
+    [ 2/13] nu=0.025 SNR=11.35 | BERpost=8.70e-02 BLER=1.00e+00 (7.1s)
+    [ 3/13] nu=0.025 SNR=11.50 | BERpost=7.87e-02 BLER=1.00e+00 (6.9s)
+    [ 4/13] nu=0.025 SNR=11.65 | BERpost=6.49e-02 BLER=1.00e+00 (6.7s)
+    [ 5/13] nu=0.025 SNR=11.80 | BERpost=4.22e-02 BLER=1.00e+00 (6.4s)
+    [ 6/13] nu=0.025 SNR=11.95 | BERpost=5.25e-03 BLER=4.26e-01 (13.6s)
+    [ 7/13] nu=0.025 SNR=12.10 | BERpost=5.46e-06 BLER=3.50e-03 (204.1s)
+    [ 8/13] nu=0.025 SNR=12.25 | BERpost=0.00e+00 BLER=0.00e+00 (161.5s)
+    [ 9/13] nu=0.025 SNR=12.40 | BERpost=0.00e+00 BLER=0.00e+00 (137.0s)
+    [10/13] nu=0.025 SNR=12.55 | BERpost=1.16e-08 BLER=2.50e-04 (120.7s)
+    [11/13] nu=0.025 SNR=12.70 | BERpost=1.16e-08 BLER=2.50e-04 (108.8s)
+    [12/13] nu=0.025 SNR=12.85 | BERpost=1.16e-08 BLER=2.50e-04 (99.6s)
+    [13/13] nu=0.025 SNR=13.00 | BERpost=1.16e-08 BLER=2.50e-04 (91.9s)
+  nu=0.05 | H(A)=1.6369 | R_dm=1.6148 | R_2D: ideal 3.274 real 3.230
+    [ 1/13] nu=0.05 SNR= 9.60 | BERpost=7.42e-02 BLER=1.00e+00 (6.9s)
+    [ 2/13] nu=0.05 SNR= 9.75 | BERpost=6.55e-02 BLER=1.00e+00 (6.7s)
+    [ 3/13] nu=0.05 SNR= 9.90 | BERpost=5.21e-02 BLER=1.00e+00 (6.5s)
+    [ 4/13] nu=0.05 SNR=10.05 | BERpost=3.51e-02 BLER=9.88e-01 (6.4s)
+    [ 5/13] nu=0.05 SNR=10.20 | BERpost=7.97e-03 BLER=7.14e-01 (8.3s)
+    [ 6/13] nu=0.05 SNR=10.35 | BERpost=4.93e-05 BLER=2.35e-02 (190.1s)
+    [ 7/13] nu=0.05 SNR=10.50 | BERpost=3.47e-08 BLER=7.50e-04 (171.4s)
+    [ 8/13] nu=0.05 SNR=10.65 | BERpost=3.47e-08 BLER=7.50e-04 (144.3s)
+    [ 9/13] nu=0.05 SNR=10.80 | BERpost=3.47e-08 BLER=7.50e-04 (126.0s)
+    [10/13] nu=0.05 SNR=10.95 | BERpost=1.16e-08 BLER=2.50e-04 (112.8s)
+    [11/13] nu=0.05 SNR=11.10 | BERpost=2.31e-08 BLER=5.00e-04 (102.8s)
+    [12/13] nu=0.05 SNR=11.25 | BERpost=0.00e+00 BLER=0.00e+00 (94.7s)
+    [13/13] nu=0.05 SNR=11.40 | BERpost=2.31e-08 BLER=5.00e-04 (88.1s)
+  nu=0.075 | H(A)=1.4011 | R_dm=1.3815 | R_2D: ideal 2.802 real 2.763
+    [ 1/13] nu=0.075 SNR= 8.00 | BERpost=6.30e-02 BLER=1.00e+00 (6.7s)
+    [ 2/13] nu=0.075 SNR= 8.15 | BERpost=5.43e-02 BLER=1.00e+00 (6.5s)
+    [ 3/13] nu=0.075 SNR= 8.30 | BERpost=4.46e-02 BLER=1.00e+00 (6.4s)
+    [ 4/13] nu=0.075 SNR= 8.45 | BERpost=3.21e-02 BLER=1.00e+00 (6.2s)
+    [ 5/13] nu=0.075 SNR= 8.60 | BERpost=1.37e-02 BLER=9.30e-01 (6.5s)
+    [ 6/13] nu=0.075 SNR= 8.75 | BERpost=6.37e-04 BLER=1.37e-01 (36.5s)
+    [ 7/13] nu=0.075 SNR= 8.90 | BERpost=2.14e-07 BLER=4.75e-03 (188.1s)
+    [ 8/13] nu=0.075 SNR= 9.05 | BERpost=1.27e-07 BLER=2.75e-03 (155.3s)
+    [ 9/13] nu=0.075 SNR= 9.20 | BERpost=8.10e-08 BLER=1.75e-03 (133.6s)
+    [10/13] nu=0.075 SNR= 9.35 | BERpost=1.33e-07 BLER=3.00e-03 (118.8s)
+    [11/13] nu=0.075 SNR= 9.50 | BERpost=5.79e-08 BLER=1.25e-03 (108.1s)
+    [12/13] nu=0.075 SNR= 9.65 | BERpost=3.47e-08 BLER=7.50e-04 (99.2s)
+    [13/13] nu=0.075 SNR= 9.80 | BERpost=5.79e-08 BLER=1.25e-03 (91.8s)
+  nu=0.1 | H(A)=1.2053 | R_dm=1.1833 | R_2D: ideal 2.411 real 2.367
+    [ 1/13] nu=0.1 SNR= 6.70 | BERpost=5.14e-02 BLER=1.00e+00 (6.5s)
+    [ 2/13] nu=0.1 SNR= 6.85 | BERpost=4.44e-02 BLER=1.00e+00 (6.4s)
+    [ 3/13] nu=0.1 SNR= 7.00 | BERpost=3.55e-02 BLER=1.00e+00 (6.2s)
+    [ 4/13] nu=0.1 SNR= 7.15 | BERpost=2.63e-02 BLER=1.00e+00 (6.1s)
+    [ 5/13] nu=0.1 SNR= 7.30 | BERpost=1.23e-02 BLER=9.42e-01 (6.4s)
+    [ 6/13] nu=0.1 SNR= 7.45 | BERpost=9.96e-04 BLER=2.48e-01 (20.5s)
+    [ 7/13] nu=0.1 SNR= 7.60 | BERpost=4.90e-06 BLER=8.50e-03 (193.9s)
+    [ 8/13] nu=0.1 SNR= 7.75 | BERpost=3.07e-07 BLER=6.25e-03 (159.2s)
+    [ 9/13] nu=0.1 SNR= 7.90 | BERpost=2.95e-07 BLER=4.50e-03 (137.2s)
+    [10/13] nu=0.1 SNR= 8.05 | BERpost=1.62e-07 BLER=3.50e-03 (121.9s)
+    [11/13] nu=0.1 SNR= 8.20 | BERpost=1.27e-07 BLER=2.75e-03 (110.7s)
+    [12/13] nu=0.1 SNR= 8.35 | BERpost=1.04e-07 BLER=2.25e-03 (101.2s)
+    [13/13] nu=0.1 SNR= 8.50 | BERpost=9.26e-08 BLER=2.00e-03 (94.1s)
+  saved -> results/pas_nu_sweep.{fig,pdf,mat}
+  nu=0 | R=3.948 bit/2D | SNR@BLER=13.57 dB | gap=1.97 dB | gain=0.00 dB
+  nu=0.025 | R=3.704 bit/2D | SNR@BLER=12.07 dB | gap=1.26 dB | gain=0.71 dB
+  nu=0.05 | R=3.230 bit/2D | SNR@BLER=10.39 dB | gap=1.15 dB | gain=0.82 dB
+  nu=0.075 | R=2.763 bit/2D | SNR@BLER=8.87 dB | gap=1.24 dB | gain=0.73 dB
+  nu=0.1 | R=2.367 bit/2D | SNR@BLER=7.59 dB | gap=1.40 dB | gain=0.57 dB
+
+[5] Throughput vs SNR
+  saved -> results/pas_throughput.{fig,pdf,mat}
+
+[6] BMD rate
+  nu=0 done
+  nu=0.025 done
+  nu=0.05 done
+  nu=0.075 done
+  nu=0.1 done
+  saved -> results/pas_bmd_rate.{fig,pdf,mat}
+=== done ===
+=== fin Wed Sep  9 21:47:19 CEST 2026 (exit=0) ===
