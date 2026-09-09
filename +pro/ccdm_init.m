@@ -1,38 +1,7 @@
 function ccdm = ccdm_init(pA, amps, n)
-% CCDM_INIT  Build a real, invertible Constant-Composition Distribution Matcher.
+%   invertible Constant-Composition Distribution Matcher.
 %
 %   ccdm = pro.ccdm_init(pA, amps, n)
-%
-%   Implements the CCDM of Bocherer, "Probabilistic Amplitude Shaping" (2023),
-%   Section 2.5: a one-to-one map from k input bits to length-n amplitude
-%   sequences of FIXED composition (type) n_1,...,n_M. All output sequences
-%   have exactly the same empirical distribution, hence "constant composition".
-%
-%   The bit<->sequence map is realized by arithmetic coding over the multiset
-%   permutations of the fixed composition (ranking/unranking), which is exact,
-%   invertible, and needs no lookup table.
-%
-%   Inputs
-%   ------
-%   pA   : (1 x M) target amplitude probabilities (Maxwell-Boltzmann), sum = 1
-%   amps : (1 x M) amplitude alphabet values (e.g. [1 3 5 7] for 8-ASK)
-%   n    : DM output length (amplitudes per DM call). Choose n | (nfec/m) so a
-%          DM sequence is never shared across codewords (Bocherer Ex. 2.1).
-%
-%   Output
-%   ------
-%   ccdm : struct with fields
-%          n        : output length
-%          M        : alphabet size
-%          amps     : alphabet
-%          comp     : (1 x M) integer composition [n_1,...,n_M], sum = n
-%          pQuant   : (1 x M) realized n-type PA' = comp/n
-%          k        : number of input bits, k = floor(log2 |T^n(P)|)
-%          Hbar     : entropy H(Abar) of the quantized type [bits/amp]
-%          Rccdm    : CCDM rate k/n [bits/amp]
-%          Rloss    : rate loss Hbar - Rccdm [bits/amp]
-%          logNperm : log2 of the multinomial |T^n(P)| (number of sequences)
-%
 %   Use pro.ccdm_encode / pro.ccdm_decode for the actual bit<->amplitude maps.
 
     pA   = pA(:).';
@@ -74,4 +43,5 @@ function ccdm = ccdm_init(pA, amps, n)
     ccdm.Rccdm    = Rccdm;
     ccdm.Rloss    = Rloss;
     ccdm.logNperm = logNperm;
+    
 end

@@ -29,7 +29,10 @@ function cfg = pas_config(m, code, Zc)
             H = dvbsLDPCPCM('1/2');
             name = 'DVB-S2 (1/2)';
             Zc   = NaN;
-
+        case 'dvbs2-1/3'
+            H    = dvbsLDPCPCM('1/3');            % (N-K) x N, sparse logical
+            name = 'DVB-S2 (1/3)';
+            Zc   = NaN;                        % not applicable
         case 'dvbs2-2/3'
             H    = dvbsLDPCPCM('2/3');            % (N-K) x N, sparse logical
             name = 'DVB-S2 (2/3)';
