@@ -21,8 +21,6 @@ targetCwErr = 100;
 %targetCwErr  = 80;      
 maxLDPCIter  = 50;
 
-if isempty(gcp('nocreate')), parpool(6); end
-
 %% ---- DM-based rate matching (64-QAM + DVB-S2 2/3, sweep nu) --------
 dm.m      = 3;
 dm.code   = 'dvbs2-2/3';
@@ -102,7 +100,7 @@ function [R2D, thSnr] = sweep_config(m, code, nu, snrRange, blerTarget, maxFrame
 
     np = numel(snrRange);
     bler = nan(1,np);
-    parfor p = 1:np
+    for p = 1:np
         [~,~,d] = fec.run_point(snrRange(p), cfg, cc, pA, amp_label, ...
                                 maxFrames, targetCwErr, maxIter);
         bler(p) = d;

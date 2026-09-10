@@ -45,7 +45,7 @@ function sch = build_schedule(n, maxTx, mode, punctureFrac, seed)
     assert(punctureFrac >= 0 && punctureFrac < 1, 'punctureFrac must be in [0,1)');
 
     % Reproducible puncturing pattern, isolated from the global rng stream so
-    % that the schedule is identical on every parfor worker and every run.
+    % that the schedule is identical on every run.
     rs      = RandStream('twister', 'Seed', seed);
     perm    = randperm(rs, n);
     nHidden = round(punctureFrac * n);

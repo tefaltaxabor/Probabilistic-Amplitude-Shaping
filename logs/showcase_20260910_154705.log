@@ -1,0 +1,40 @@
+=== inicio 10-Sep-2026 15:47:05 (local, dvbs2ldpc) ===
+=== showcase_pas ===
+FEC DVB-S2 (2/3) | N=64800 K=43200 Rc=0.6667 | n=21600 symbols/dim
+CCDM block nDM=540 -> 40 blocks per codeword
+
+[1] CCDM rate loss vs block length
+  nu=0.000  H(A)=2.0000 | R_dm(n=540)=1.9741  R_loss=0.0259
+  nu=0.025  H(A)=1.8781 | R_dm(n=540)=1.8519  R_loss=0.0262
+  nu=0.050  H(A)=1.6369 | R_dm(n=540)=1.6148  R_loss=0.0221
+  nu=0.075  H(A)=1.4011 | R_dm(n=540)=1.3815  R_loss=0.0196
+  nu=0.100  H(A)=1.2053 | R_dm(n=540)=1.1833  R_loss=0.0220
+  saved -> results\pas_ccdm_rateloss.{fig,pdf,mat}
+
+[2] Fake-CCDM validation
+  H(A) = 1.6369 bits/amplitude
+  D(p_CC^(n=21600)  || p_A) = 2.010e-09   (constant composition, what the code does)
+  D(p_VD^(n=540)  || p_A) = 5.875e-06   (same quantiser at the matcher block length)
+  D(p_iid        || p_A) = 7.963e-07   (i.i.d. sampler, what the text claims)
+  E_s shaped=18.4343  uniform=42.0000  ->  energy reduction 3.58 dB
+       (at fixed d_min, NOT the shaping gain: the rate also drops from 2.000 to 1.637 bits/amplitude.
+        The shaping gain is the gap-to-capacity comparison in panel 4.)
+  P(sign>0) = 0.5010  (LDPC parity fills the signs; should be ~0.5)
+[Warning: Vectorized content might take a long time to create, or it might contain unexpected results. Set 'ContentType' to 'image' for better performance. <a
+href="matlab:warning('off', 'MATLAB:print:ContentTypeImageSuggested')">Click here</a> to not see this message again.] 
+  saved -> results\pas_ccdm_validation.{fig,pdf,mat}
+
+[3] Waterfall at nu=0.05
+  [ 1/21] SNR= 8.60 | BERpre=1.160e-01 BERpost=1.132e-01 BLER=1.000e+00 (9.9s)
+  [ 2/21] SNR= 8.75 | BERpre=1.131e-01 BERpost=1.085e-01 BLER=1.000e+00 (10.2s)
+  [ 3/21] SNR= 8.90 | BERpre=1.104e-01 BERpost=1.036e-01 BLER=1.000e+00 (9.3s)
+  [ 4/21] SNR= 9.05 | BERpre=1.079e-01 BERpost=9.836e-02 BLER=1.000e+00 (9.4s)
+  [ 5/21] SNR= 9.20 | BERpre=1.051e-01 BERpost=9.287e-02 BLER=1.000e+00 (9.1s)
+  [ 6/21] SNR= 9.35 | BERpre=1.026e-01 BERpost=8.664e-02 BLER=1.000e+00 (9.0s)
+  [ 7/21] SNR= 9.50 | BERpre=1.000e-01 BERpost=7.882e-02 BLER=1.000e+00 (8.0s)
+  [ 8/21] SNR= 9.65 | BERpre=9.763e-02 BERpost=7.147e-02 BLER=1.000e+00 (8.1s)
+  [ 9/21] SNR= 9.80 | BERpre=9.478e-02 BERpost=6.071e-02 BLER=1.000e+00 (7.7s)
+  [10/21] SNR= 9.95 | BERpre=9.240e-02 BERpost=4.862e-02 BLER=1.000e+00 (9.0s)
+  [11/21] SNR=10.10 | BERpre=8.973e-02 BERpost=2.681e-02 BLER=9.878e-01 (8.8s)
+  [12/21] SNR=10.25 | BERpre=8.710e-02 BERpost=2.972e-03 BLER=4.000e-01 (21.3s)
+  [13/21] SNR=10.40 | BERpre=8.463e-02 BERpost=3.611e-06 BLER=4.750e-03 (322.6s)

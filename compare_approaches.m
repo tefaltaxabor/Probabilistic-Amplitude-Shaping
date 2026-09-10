@@ -50,9 +50,7 @@ nPts   = numel(SNR_dB);
 thrA   = nan(1,nPts);  avgTxA = nan(1,nPts);  blerA = nan(nPts,maxTx);
 thrB   = nan(1,nPts);  avgTxB = nan(1,nPts);  blerB = nan(nPts,maxTx);
 
-pool = gcp('nocreate'); if isempty(pool), parpool(6); end
-
-parfor p = 1:nPts
+for p = 1:nPts
     snr = SNR_dB(p);
     oA = harq.run_point(snr, cfg, cstll, pA, amp_label, schA, ...
                         maxFrames, targetCwErr, maxLDPCIter);

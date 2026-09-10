@@ -70,8 +70,6 @@ berPost = nan(1, nPts);
 bler    = nan(1, nPts);
 ferInfo = nan(1, nPts);
 
-%pool = gcp('nocreate'); if isempty(pool), parpool(6); end
-
 for p = 1:nPts
     snr = SNR_dB(p);
     bitErrPre=0; nBitsPre=0; bitErrPost=0; nBitsPost=0;

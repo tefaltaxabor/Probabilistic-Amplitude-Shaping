@@ -27,8 +27,6 @@ cstll = pro.dig_mod_ASK(m, "gray");
 cfg = fec.pas_config(m, code);
 fprintf('FEC: %s | n=%d | nu sweep = %s\n', cfg.name, cfg.n, mat2str(nus));
 
-if isempty(gcp('nocreate')), parpool(6); end
-
 % ---------------- Sweep per nu ----------------
 nN = numel(nus);
 S = struct('nu',{},'HA',{},'R2D',{},'SNR',{},'bler',{},'berPost',{});
@@ -39,7 +37,7 @@ for i = 1:nN
     fprintf('\n=== nu=%.3f | H(A)=%.3f bits/amp | R=%.2f bits/2D ===\n', nus(i), HA, R2D);
 
     bpost = nan(1,np);  bl = nan(1,np);
-    parfor p = 1:np
+    for p = 1:np
         [~, b, d] = fec.run_point(snr(p), cfg, cc, pA, amp_label, ...
                           maxFrames, targetCwErr, maxLDPCIter);
         bpost(p) = b;  bl(p) = d;
@@ -73,7 +71,7 @@ co = turbo(nN);
 labels = arrayfun(@(s) sprintf('\\nu=%.3g (R=%.2f)', s.nu, s.R2D), S, 'uni', 0);
 
 % Fig 1: BLER vs SNR (each nu shifts with its waterfall -> rate-confounded, NOT a fair gain)
-figure('Name','PAS: BLER vs SNR (nu sweep)','Color','w'); hold on; grid on;
+f1 = figure('Name','PAS: BLER vs SNR (nu sweep)','Color','w'); hold on; grid on;
 for i = 1:nN
     yb = S(i).bler; yb(yb==0) = NaN;
     semilogy(S(i).SNR, yb, '-o', 'Color', co(i,:), 'LineWidth', 1.4, 'DisplayName', labels{i});
@@ -83,7 +81,7 @@ legend('Location','southwest'); title('PAS 64-QAM, DVB-S2 2/3 — BLER vs SNR');
 
 % Fig 2: throughput R vs SNR threshold against capacity (shaping gain = horizontal gap to capacity)
 snrGrid = 0:0.05:24;
-figure('Name','PAS: R vs SNR threshold vs capacity (shaping gain)','Color','w'); hold on; grid on;
+f2 = figure('Name','PAS: R vs SNR threshold vs capacity (shaping gain)','Color','w'); hold on; grid on;
 plot(snrGrid, log2(1 + 10.^(snrGrid/10)), 'k--', 'LineWidth', 1.3, ...
      'DisplayName', 'AWGN capacity log_2(1+SNR)');
 plot(thSnr, [S.R2D], '-o', 'LineWidth', 1.6, 'MarkerFaceColor', 'auto', ...
@@ -96,11 +94,18 @@ legend('Location','northwest'); xlim([4 16]); ylim([0 7]);
 title('PAS 64-QAM, DVB-S2 2/3 — shaping gain = horizontal gap to capacity');
 
 % Fig 3: gap to capacity and shaping gain (correct) vs nu
-figure('Name','PAS: gap to capacity and shaping gain vs nu','Color','w');
+f3 = figure('Name','PAS: gap to capacity and shaping gain vs nu','Color','w');
 yyaxis left;  plot(nus, gapCap, '-o', 'LineWidth', 1.6); ylabel('gap to AWGN capacity [dB]');
 yyaxis right; plot(nus, shGain, '-s', 'LineWidth', 1.6); ylabel('shaping gain vs uniform [dB]');
 grid on; xlabel('\nu (shaping strength)');
 title(sprintf('Gap to capacity and shaping gain @ BLER=%.0e (DVB-S2 2/3)', blerTarget));
+
+% ---------------- Save (figures + data, so plots can be redone without MC) ----------------
+src.save_result(f1, 'shaping_bler_vs_snr', 'results');
+src.save_result(f2, 'shaping_rate_vs_threshold', 'results');
+src.save_result(f3, 'shaping_gap_and_gain', 'results');
+src.save_result([], 'compare_shaping', 'results', struct('S',S, 'nus',nus, 'code',code, ...
+    'thSnr',thSnr, 'snrMin',snrMin, 'gapCap',gapCap, 'shGain',shGain, 'blerTarget',blerTarget));
 
 %% ---------------- helper ----------------
 function th = interp_threshold(snr, bler, target)

@@ -4,6 +4,8 @@ function showcase_pas(parts, opts)
 %   showcase_pas                 % run every panel with default settings
 %   showcase_pas([1 2])          % run only the cheap analytical panels
 %   showcase_pas(1:6, opts)      % override the Monte-Carlo budget
+%   showcase_pas([4 5], struct('reuseMC',true))
+%                                % redo panels 4-5 from the saved BLER curves
 %
 %   Produces, into results/, the six panels that document the PAS chain on
 %   its own (before HARQ is introduced). Panels 1-2 are pure computation and
@@ -48,6 +50,10 @@ function showcase_pas(parts, opts)
     d.nSymBMD     = 4e5;               % symbols per SNR point for panel 6
     d.outdir      = 'results';
     d.seed        = 7;
+    d.reuseMC     = false;             % panel 4: reload the BLER curves from
+                                       % outdir/pas_nu_sweep.mat instead of
+                                       % re-simulating (rates, thresholds and
+                                       % figures are still recomputed)
     opts = merge_opts(d, opts);
 
     rng(opts.seed);
@@ -351,28 +357,39 @@ function S = panel4_nu_sweep(ctx)
     S  = struct('nu',{},'HA',{},'R2D',{},'Rdm',{},'R2D_real',{}, ...
                 'SNR',{},'bler',{},'berPost',{});
 
+    if o.reuseMC
+        f = fullfile(o.outdir, 'pas_nu_sweep.mat');
+        L = load(f, 'S');  Smc = L.S;
+        assert(isequal([Smc.nu], o.nus), 'nus in %s do not match opts.nus', f);
+        fprintf('  reusing the Monte Carlo in %s (rates recomputed)\n', f);
+    end
+
     for i = 1:nN
         [pA, px, HA] = pro.build_shaping(o.nus(i), ctx.cstll, ctx.amps);
         cs = ctx.cstll;  cs.px = px;
         cs.alphabet = cs.alphabet / sqrt(sum(px(:) .* (cs.alphabet(:).^2)));
 
-        cc  = pro.ccdm_init(pA, ctx.amps, o.nDM);   % real matcher at this nu
-        snr = ranges{i};  np = numel(snr);
+        Rdm = matcher_rate(o.nus(i), pA, ctx.amps, o.nDM);
         fprintf('  nu=%.3g | H(A)=%.4f | R_dm=%.4f | R_2D: ideal %.3f real %.3f\n', ...
-                o.nus(i), HA, cc.Rccdm, 2*HA, 2*cc.Rccdm);
+                o.nus(i), HA, Rdm, 2*HA, 2*Rdm);
 
-        bpost = nan(1,np);  bl = nan(1,np);
-        for p = 1:np
-            t0 = tic;
-            [~, b, c] = fec.run_point(snr(p), ctx.cfg, cs, pA, ctx.amp_label, ...
-                                      o.maxFrames, o.targetCwErr, o.maxLDPCIter);
-            bpost(p) = b;  bl(p) = c;
-            fprintf('    [%2d/%2d] nu=%.3g SNR=%5.2f | BERpost=%.2e BLER=%.2e (%.1fs)\n', ...
-                    p, np, o.nus(i), snr(p), b, c, toc(t0));
+        if o.reuseMC
+            snr = Smc(i).SNR;  bl = Smc(i).bler;  bpost = Smc(i).berPost;
+        else
+            snr = ranges{i};  np = numel(snr);
+            bpost = nan(1,np);  bl = nan(1,np);
+            for p = 1:np
+                t0 = tic;
+                [~, b, c] = fec.run_point(snr(p), ctx.cfg, cs, pA, ctx.amp_label, ...
+                                          o.maxFrames, o.targetCwErr, o.maxLDPCIter);
+                bpost(p) = b;  bl(p) = c;
+                fprintf('    [%2d/%2d] nu=%.3g SNR=%5.2f | BERpost=%.2e BLER=%.2e (%.1fs)\n', ...
+                        p, np, o.nus(i), snr(p), b, c, toc(t0));
+            end
         end
 
-        S(i) = struct('nu',o.nus(i), 'HA',HA, 'R2D',2*HA, 'Rdm',cc.Rccdm, ...
-                      'R2D_real',2*cc.Rccdm, 'SNR',snr, 'bler',bl, 'berPost',bpost);
+        S(i) = struct('nu',o.nus(i), 'HA',HA, 'R2D',2*HA, 'Rdm',Rdm, ...
+                      'R2D_real',2*Rdm, 'SNR',snr, 'bler',bl, 'berPost',bpost);
     end
 
     % --- thresholds and gap to capacity on the SNR axis ---
@@ -448,8 +465,10 @@ function panel5_throughput(ctx, Sin)
     for i = 1:nN
         etaReal  = S(i).R2D_real .* (1 - S(i).bler);
         etaIdeal = S(i).R2D      .* (1 - S(i).bler);
+        nm = sprintf('\\nu=%.3g, real CCDM', S(i).nu);
+        if S(i).nu == 0, nm = '\nu=0 (uniform, no DM)'; end
         plot(ax, S(i).SNR, etaReal, '-o', 'Color', co(i,:), 'LineWidth',1.5, ...
-             'MarkerSize',4, 'DisplayName', sprintf('\\nu=%.3g, real CCDM', S(i).nu));
+             'MarkerSize',4, 'DisplayName', nm);
         plot(ax, S(i).SNR, etaIdeal, '--', 'Color', co(i,:), 'LineWidth',1.0, ...
              'HandleVisibility','off');
     end
@@ -467,10 +486,16 @@ function panel5_throughput(ctx, Sin)
     for j = 1:numel(allSNR)
         best = 0;
         for i = 1:nN
-            if allSNR(j) >= min(S(i).SNR) && allSNR(j) <= max(S(i).SNR)
+            if allSNR(j) < min(S(i).SNR), continue; end
+            if allSNR(j) <= max(S(i).SNR)
                 b = interp1(S(i).SNR, S(i).bler, allSNR(j), 'linear');
-                best = max(best, S(i).R2D_real * (1 - b));
+            else
+                % above the simulated window: BLER only falls with SNR, so
+                % the last simulated point is an upper bound. Without this
+                % the envelope dropped to 0 between adjacent nu windows.
+                b = S(i).bler(end);
             end
+            best = max(best, S(i).R2D_real * (1 - b));
         end
         env(j) = best;
     end
@@ -563,6 +588,19 @@ function S = get_nu_data(ctx, Sin, quiet)
     elseif ~quiet
         warning('showcase_pas:noNuData', ...
             'Panel 4 data not found (%s); run showcase_pas(4) first.', f);
+    end
+end
+
+function R = matcher_rate(nu, pA, amps, nDM)
+% Rate of the amplitude source [bits/amplitude]. The uniform case (nu=0) needs
+% no matcher -- the amplitude bits ARE the data bits -- so it pays no CCDM
+% rate loss; charging it one would inflate every shaping gain measured
+% against it.
+    if nu == 0
+        R = log2(numel(pA));
+    else
+        cc = pro.ccdm_init(pA, amps, nDM);
+        R  = cc.Rccdm;
     end
 end
 

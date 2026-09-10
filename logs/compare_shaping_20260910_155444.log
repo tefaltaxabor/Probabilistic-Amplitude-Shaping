@@ -1,0 +1,7 @@
+=== inicio 10-Sep-2026 15:54:44 (local) ===
+FEC: DVB-S2 (2/3) | n=21600 | nu sweep = [0 0.025 0.05 0.075 0.1]
+
+=== nu=0.000 | H(A)=2.000 bits/amp | R=4.00 bits/2D ===
+  nu=0.000 SNR=13.20 | BERpost=7.32e-02 BLER=1.00e+00
+  nu=0.000 SNR=13.30 | BERpost=5.62e-02 BLER=1.00e+00
+  nu=0.000 SNR=13.40 | BERpost=2.06e-02 BLER=7.23e-01

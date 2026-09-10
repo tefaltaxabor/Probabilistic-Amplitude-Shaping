@@ -26,9 +26,6 @@ for k = 1:cstll.M
 end
 cstll.px = px;
 
-% ---------------- Parallel pool ----------------
-if isempty(gcp('nocreate')), parpool(6); end
-
 % ---------------- Sweep per code ----------------
 nCodes = numel(codes);
 R = struct('name',{},'SNR',{},'berPre',{},'berPost',{},'bler',{},'n',{});
@@ -40,7 +37,7 @@ for c = 1:nCodes
             cfg.name, cfg.N, cfg.K, cfg.Rc, cfg.n);
 
     bpre = nan(1,np); bpost = nan(1,np); bl = nan(1,np);
-    parfor p = 1:np
+    for p = 1:np
         [a, b, d] = fec.run_point(snr(p), cfg, cstll, ...
                           pA, amp_label, maxFrames, targetCwErr, maxLDPCIter);
         bpre(p) = a;  bpost(p) = b;  bl(p) = d;
@@ -62,7 +59,7 @@ end
 % ---------------- Plots ----------------
 co = lines(nCodes);
 
-figure('Name','PAS 64-QAM: BLER DVB-S2 vs 5G NR','Color','w'); hold on; grid on;
+f1 = figure('Name','PAS 64-QAM: BLER DVB-S2 vs 5G NR','Color','w'); hold on; grid on;
 for c = 1:nCodes
     yb = R(c).bler; yb(yb==0) = NaN;            % avoid log(0)
     semilogy(R(c).SNR, yb, '-o', 'Color', co(c,:), 'LineWidth', 1.4, ...
@@ -71,7 +68,7 @@ end
 set(gca,'YScale','log'); xlabel('SNR [dB]'); ylabel('BLER');
 legend('Location','southwest'); title(sprintf('PAS 64-QAM, rate 2/3, \\nu=%.2g', nu));
 
-figure('Name','PAS 64-QAM: post-FEC BER DVB-S2 vs 5G NR','Color','w'); hold on; grid on;
+f2 = figure('Name','PAS 64-QAM: post-FEC BER DVB-S2 vs 5G NR','Color','w'); hold on; grid on;
 for c = 1:nCodes
     yb = R(c).berPost; yb(yb==0) = NaN;
     semilogy(R(c).SNR, yb, '-s', 'Color', co(c,:), 'LineWidth', 1.4, ...
@@ -79,3 +76,9 @@ for c = 1:nCodes
 end
 set(gca,'YScale','log'); xlabel('SNR [dB]'); ylabel('post-FEC BER');
 legend('Location','southwest'); title(sprintf('PAS 64-QAM, rate 2/3, \\nu=%.2g', nu));
+
+% ---------------- Save (figures + data, so plots can be redone without MC) ----------------
+src.save_result(f1, 'fec_bler_dvbs2_vs_nr', 'results');
+src.save_result(f2, 'fec_berpost_dvbs2_vs_nr', 'results');
+src.save_result([], 'compare_fec', 'results', struct('R',R, 'codes',{codes}, 'nu',nu, ...
+    'maxFrames',maxFrames, 'targetCwErr',targetCwErr, 'maxLDPCIter',maxLDPCIter));

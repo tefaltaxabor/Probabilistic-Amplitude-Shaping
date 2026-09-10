@@ -20,7 +20,6 @@ for k = 1:cstll.M
 end
 cstll.px = px;
 
-if isempty(gcp('nocreate')), parpool(6); end
 P = {cstll, pA, amp_label, maxFrames, targetCwErr, maxLDPCIter};
 
 %% ---------- Experiment 1: blocklength family (NR BG1) + DVB-S2 ----------
@@ -31,7 +30,7 @@ fam = { {'nr-bg1-2/3',  96, 10.5:0.15:13.2}, ...   % n = 1056
         {'dvbs2-2/3',  NaN, 9.6:0.15:10.65} };     % n = 21600 (reference)
 Rfam = sweep_jobs(fam, m, P);
 
-figure('Name','PAS 64-QAM: BLER vs blocklength (NR BG1)','Color','w'); hold on; grid on;
+f1 = figure('Name','PAS 64-QAM: BLER vs blocklength (NR BG1)','Color','w'); hold on; grid on;
 co = parula(numel(Rfam));
 for c = 1:numel(Rfam)
     yb = Rfam(c).bler; yb(yb==0) = NaN;
@@ -52,7 +51,7 @@ mn = { {'nr-bg1-2/3', 160, 10.4:0.15:12.9}, ...    % n = 11*160 = 1760
        {'nr-bg2-2/3', 352, 10.4:0.15:12.9} };      % n =  5*352 = 1760
 Rmn = sweep_jobs(mn, m, P);
 
-figure('Name','PAS 64-QAM: BG1 vs BG2 at equal n (1760)','Color','w'); hold on; grid on;
+f2 = figure('Name','PAS 64-QAM: BG1 vs BG2 at equal n (1760)','Color','w'); hold on; grid on;
 com = lines(numel(Rmn));
 for c = 1:numel(Rmn)
     yb = Rmn(c).bler; yb(yb==0) = NaN;
@@ -62,6 +61,12 @@ end
 set(gca,'YScale','log'); xlabel('SNR [dB]'); ylabel('BLER');
 legend('Location','southwest');
 title(sprintf('NR BG1 vs BG2 at n=1760 (same blocklength and rate), \\nu=%.2g', nu));
+
+% ---------------- Save (figures + data, so plots can be redone without MC) ----------------
+src.save_result(f1, 'blocklength_nr_bg1_vs_dvbs2', 'results');
+src.save_result(f2, 'bg1_vs_bg2_n1760', 'results');
+src.save_result([], 'compare_blocklength', 'results', struct('Rfam',Rfam, 'Rmn',Rmn, 'nu',nu, ...
+    'maxFrames',maxFrames, 'targetCwErr',targetCwErr, 'maxLDPCIter',maxLDPCIter));
 
 % ---------------- Tables ----------------
 fprintf('\n');
@@ -84,7 +89,7 @@ function R = sweep_jobs(jobs, m, P)
         np  = numel(snr);
         fprintf('\n=== %s | Zc=%g N=%d K=%d | n=%d ===\n', cfg.name, Zc, cfg.N, cfg.K, cfg.n);
         bpost = nan(1,np); bl = nan(1,np);
-        parfor p = 1:np
+        for p = 1:np
             [~, b, d] = fec.run_point(snr(p), cfg, cstll, ...
                               pA, amp_label, maxFrames, targetCwErr, maxLDPCIter);
             bpost(p) = b; bl(p) = d;
