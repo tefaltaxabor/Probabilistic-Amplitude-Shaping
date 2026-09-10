@@ -1,0 +1,46 @@
+=== inicio Thu Sep 10 05:44:51 PM CEST 2026 en tueilnt-sim22.ice.cit.tum.de ===
+Using Matlab's default Java.
+FEC: DVB-S2 (2/3) | n=21600 | nu sweep = [0 0.025 0.05 0.075 0.1]
+
+=== nu=0.000 | H(A)=2.000 bits/amp | R=4.00 bits/2D ===
+  nu=0.000 SNR=13.20 | BERpost=7.32e-02 BLER=1.00e+00
+  nu=0.000 SNR=13.30 | BERpost=5.62e-02 BLER=1.00e+00
+  nu=0.000 SNR=13.40 | BERpost=2.06e-02 BLER=7.23e-01
+  nu=0.000 SNR=13.50 | BERpost=8.04e-04 BLER=7.72e-02
+  nu=0.000 SNR=13.60 | BERpost=0.00e+00 BLER=0.00e+00
+  nu=0.000 SNR=13.70 | BERpost=0.00e+00 BLER=0.00e+00
+  nu=0.000 SNR=13.80 | BERpost=0.00e+00 BLER=0.00e+00
+  nu=0.000 SNR=13.90 | BERpost=0.00e+00 BLER=0.00e+00
+  nu=0.000 SNR=14.00 | BERpost=0.00e+00 BLER=0.00e+00
+
+=== nu=0.025 | H(A)=1.878 bits/amp | R=3.76 bits/2D ===
+  nu=0.025 SNR=11.60 | BERpost=6.83e-02 BLER=1.00e+00
+  nu=0.025 SNR=11.70 | BERpost=5.80e-02 BLER=1.00e+00
+  nu=0.025 SNR=11.80 | BERpost=4.35e-02 BLER=1.00e+00
+  nu=0.025 SNR=11.90 | BERpost=1.49e-02 BLER=7.69e-01
+  nu=0.025 SNR=12.00 | BERpost=7.29e-04 BLER=1.03e-01
+  nu=0.025 SNR=12.10 | BERpost=1.37e-05 BLER=1.25e-03
+  nu=0.025 SNR=12.20 | BERpost=1.93e-08 BLER=4.17e-04
+  nu=0.025 SNR=12.30 | BERpost=0.00e+00 BLER=0.00e+00
+  nu=0.025 SNR=12.40 | BERpost=0.00e+00 BLER=0.00e+00
+
+=== nu=0.050 | H(A)=1.637 bits/amp | R=3.27 bits/2D ===
+  nu=0.050 SNR=10.00 | BERpost=4.29e-02 BLER=1.00e+00
+  nu=0.050 SNR=10.10 | BERpost=2.75e-02 BLER=1.00e+00
+  nu=0.050 SNR=10.20 | BERpost=8.36e-03 BLER=7.41e-01
+  nu=0.050 SNR=10.30 | BERpost=6.53e-04 BLER=9.93e-02
+  nu=0.050 SNR=10.40 | BERpost=2.19e-06 BLER=3.33e-03
+  nu=0.050 SNR=10.50 | BERpost=3.86e-08 BLER=8.33e-04
+  nu=0.050 SNR=10.60 | BERpost=5.79e-08 BLER=1.25e-03
+  nu=0.050 SNR=10.70 | BERpost=5.79e-08 BLER=1.25e-03
+  nu=0.050 SNR=10.80 | BERpost=7.72e-08 BLER=1.67e-03
+
+=== nu=0.075 | H(A)=1.401 bits/amp | R=2.80 bits/2D ===
+  nu=0.075 SNR= 8.40 | BERpost=3.67e-02 BLER=1.00e+00
+  nu=0.075 SNR= 8.50 | BERpost=2.73e-02 BLER=1.00e+00
+  nu=0.075 SNR= 8.60 | BERpost=1.42e-02 BLER=9.42e-01
+  nu=0.075 SNR= 8.70 | BERpost=2.94e-03 BLER=4.21e-01
+  nu=0.075 SNR= 8.80 | BERpost=1.37e-04 BLER=4.46e-02
+  nu=0.075 SNR= 8.90 | BERpost=2.70e-07 BLER=5.83e-03
+  nu=0.075 SNR= 9.00 | BERpost=9.65e-08 BLER=2.08e-03
+  nu=0.075 SNR= 9.10 | BERpost=7.72e-08 BLER=1.67e-03
