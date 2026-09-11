@@ -395,7 +395,7 @@ function S = panel4_nu_sweep(ctx)
     % --- thresholds and gap to capacity on the SNR axis ---
     th = nan(1,nN); snrMin = nan(1,nN); gap = nan(1,nN);
     for i = 1:nN
-        th(i)     = interp_threshold(S(i).SNR, S(i).bler, o.blerTarget);
+        th(i)     = interp_threshold(S(i).SNR, S(i).bler, o.blerTarget, 1/(2*o.maxFrames));
         snrMin(i) = 10*log10(2^S(i).R2D_real - 1);   % Shannon SNR for that rate
         gap(i)    = th(i) - snrMin(i);
     end
@@ -552,7 +552,7 @@ function panel6_bmd(ctx, Sin)
     if ~isempty(S)
         th = nan(1,numel(S)); rr = nan(1,numel(S));
         for i = 1:numel(S)
-            th(i) = interp_threshold(S(i).SNR, S(i).bler, o.blerTarget);
+            th(i) = interp_threshold(S(i).SNR, S(i).bler, o.blerTarget, 1/(2*o.maxFrames));
             rr(i) = S(i).R2D_real;
         end
         ok = isfinite(th);
@@ -604,10 +604,15 @@ function R = matcher_rate(nu, pA, amps, nDM)
     end
 end
 
-function t = interp_threshold(snr, bler, target)
+function t = interp_threshold(snr, bler, target, blerRes)
 % First crossing of `target`, interpolated in log10(BLER) vs SNR.
+% A point with no codeword errors is not BLER=0 but BLER < blerRes, the
+% resolution of the simulation (1/codewords simulated), so it enters the
+% interpolation at blerRes. Dropping it instead gave NaN whenever a curve
+% jumped from above the target straight to zero errors.
     snr = snr(:).';  bler = bler(:).';
-    ok = isfinite(bler) & bler > 0;
+    bler(bler == 0) = blerRes;
+    ok = isfinite(bler);
     snr = snr(ok);  bler = bler(ok);
     if numel(snr) < 2 || min(bler) > target || max(bler) < target
         t = NaN;  return;

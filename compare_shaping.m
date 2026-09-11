@@ -3,7 +3,10 @@
 %% nu=0 = uniform (baseline). The gain is measured on the SNR axis as the
 %% horizontal gap to AWGN capacity, because at fixed Rc=2/3 each nu has a
 %% different net rate R2D = 2*H(A) bits/2D symbol.
-clear; rng(7);
+%% reuseMC=true redraws thresholds and figures from results/compare_shaping.mat
+%% without re-simulating:   matlab -batch "reuseMC=true; compare_shaping"
+clearvars -except reuseMC; rng(7);
+if ~exist('reuseMC','var'), reuseMC = false; end
 
 m    = 3;
 code = 'dvbs2-2/3';
@@ -30,7 +33,14 @@ fprintf('FEC: %s | n=%d | nu sweep = %s\n', cfg.name, cfg.n, mat2str(nus));
 % ---------------- Sweep per nu ----------------
 nN = numel(nus);
 S = struct('nu',{},'HA',{},'R2D',{},'SNR',{},'bler',{},'berPost',{});
-for i = 1:nN
+nSim = nN;
+if reuseMC      % redraw only: BLER curves from the saved .mat, no Monte Carlo
+    L = load(fullfile('results','compare_shaping.mat'), 'S');  S = L.S;
+    assert(isequal([S.nu], nus), 'nus in compare_shaping.mat do not match');
+    fprintf('reusing the Monte Carlo in results/compare_shaping.mat\n');
+    nSim = 0;
+end
+for i = 1:nSim
     [pA, px, HA] = pro.build_shaping(nus(i), cstll, amps);
     cc = cstll;  cc.px = px;  R2D = 2*HA;
     snr = ranges{i};  np = numel(snr);
@@ -54,7 +64,7 @@ end
 %   gain      = gap(uniform) - gap(nu)  (what shaping recovers toward capacity)
 thSnr = nan(1,nN);  snrMin = nan(1,nN);  gapCap = nan(1,nN);
 for i = 1:nN
-    thSnr(i)  = interp_threshold(S(i).SNR, S(i).bler, blerTarget);
+    thSnr(i)  = interp_threshold(S(i).SNR, S(i).bler, blerTarget, 1/(2*maxFrames));
     snrMin(i) = 10*log10(2^S(i).R2D - 1);     % Shannon AWGN for R2D bits/2D
     gapCap(i) = thSnr(i) - snrMin(i);
 end
@@ -108,8 +118,13 @@ src.save_result([], 'compare_shaping', 'results', struct('S',S, 'nus',nus, 'code
     'thSnr',thSnr, 'snrMin',snrMin, 'gapCap',gapCap, 'shGain',shGain, 'blerTarget',blerTarget));
 
 %% ---------------- helper ----------------
-function th = interp_threshold(snr, bler, target)
-    ok = isfinite(bler) & bler > 0;  snr = snr(ok);  bler = bler(ok);
+function th = interp_threshold(snr, bler, target, blerRes)
+% A point with no codeword errors means BLER < blerRes (1/codewords
+% simulated), not BLER=0: it enters the interpolation at blerRes instead of
+% being dropped, which gave NaN when a curve jumped from above the target
+% straight to zero errors.
+    bler(bler == 0) = blerRes;
+    ok = isfinite(bler);  snr = snr(ok);  bler = bler(ok);
     [snr, idx] = sort(snr);  bler = bler(idx);
     th = NaN;
     if numel(snr) < 2 || min(bler) > target || max(bler) < target, return; end

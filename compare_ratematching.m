@@ -36,18 +36,18 @@ cv.ranges = { 5.5:0.2:8.5, 13.2:0.1:14.2, 18.5:0.2:21.5 }; %aumentar el snr
 
 % el dm
 nD = numel(dm.nus);
-dmR = nan(1,nD); dmTh = nan(1,nD);
+dmR = nan(1,nD); dmTh = nan(1,nD); dmBler = cell(1,nD);   % BLER curves saved in the .mat
 for i = 1:nD
-    [dmR(i), dmTh(i)] = sweep_config(dm.m, dm.code, dm.nus(i), dm.ranges{i}, ...
+    [dmR(i), dmTh(i), dmBler{i}] = sweep_config(dm.m, dm.code, dm.nus(i), dm.ranges{i}, ...
                           blerTarget, maxFrames, targetCwErr, maxLDPCIter);
     fprintf('[DM ] nu=%.3f  R2D=%.3f  SNR@BLER=%.2f dB\n', dm.nus(i), dmR(i), dmTh(i));
 end
 
 %el normal
 nC = numel(cv.m);
-cvR = nan(1,nC); cvTh = nan(1,nC);
+cvR = nan(1,nC); cvTh = nan(1,nC); cvBler = cell(1,nC);
 for j = 1:nC
-    [cvR(j), cvTh(j)] = sweep_config(cv.m(j), cv.code{j}, 0, cv.ranges{j}, ...
+    [cvR(j), cvTh(j), cvBler{j}] = sweep_config(cv.m(j), cv.code{j}, 0, cv.ranges{j}, ...
                           blerTarget, maxFrames, targetCwErr, maxLDPCIter);
     fprintf('[CONV] %s (uniform)  R2D=%.3f  SNR@BLER=%.2f dB\n', cv.code{j}, cvR(j), cvTh(j));
 end
@@ -89,7 +89,7 @@ fprintf('  code          R2D     SNR@BLER[dB]\n');
 for j = 1:nC, fprintf('  %-12s  %.3f   %7.2f\n', cv.code{j}, cvR(j), cvTh(j)); end
 
 %% ============================== helpers ======================================
-function [R2D, thSnr] = sweep_config(m, code, nu, snrRange, blerTarget, maxFrames, targetCwErr, maxIter)
+function [R2D, thSnr, bler] = sweep_config(m, code, nu, snrRange, blerTarget, maxFrames, targetCwErr, maxIter)
     
     cstll = pro.dig_mod_ASK(m, "gray");
     [amp_label, amps] = pro.get_amplitude_label(cstll);
@@ -105,12 +105,17 @@ function [R2D, thSnr] = sweep_config(m, code, nu, snrRange, blerTarget, maxFrame
                                 maxFrames, targetCwErr, maxIter);
         bler(p) = d;
     end
-    thSnr = interp_threshold(snrRange, bler, blerTarget);
+    thSnr = interp_threshold(snrRange, bler, blerTarget, 1/(2*maxFrames));
 
 end
 
-function th = interp_threshold(snr, bler, target)
-    ok = isfinite(bler) & bler > 0;  snr = snr(ok);  bler = bler(ok);
+function th = interp_threshold(snr, bler, target, blerRes)
+% A point with no codeword errors means BLER < blerRes (1/codewords
+% simulated), not BLER=0: it enters the interpolation at blerRes instead of
+% being dropped, which gave NaN when a curve jumped from above the target
+% straight to zero errors.
+    bler(bler == 0) = blerRes;
+    ok = isfinite(bler);  snr = snr(ok);  bler = bler(ok);
     [snr, idx] = sort(snr);  bler = bler(idx);
     th = NaN;
     if numel(snr) < 2 || min(bler) > target || max(bler) < target, return; end
