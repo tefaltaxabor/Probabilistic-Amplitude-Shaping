@@ -1,0 +1,102 @@
+=== inicio Thu Sep 10 06:28:15 PM CEST 2026 en tueilnt-sim22.ice.cit.tum.de ===
+Using Matlab's default Java.
+
+=== DVB-S2 (2/3) | N=64800 K=43200 Rc=0.6667 | n=21600 symbols/dim ===
+  DVB-S2 (2/3)     SNR= 9.70 | BERpre=9.65e-02 BERpost=6.78e-02 BLER=1.00e+00
+  DVB-S2 (2/3)     SNR= 9.80 | BERpre=9.51e-02 BERpost=6.17e-02 BLER=1.00e+00
+  DVB-S2 (2/3)     SNR= 9.90 | BERpre=9.32e-02 BERpost=5.29e-02 BLER=1.00e+00
+  DVB-S2 (2/3)     SNR=10.00 | BERpre=9.13e-02 BERpost=4.20e-02 BLER=1.00e+00
+  DVB-S2 (2/3)     SNR=10.10 | BERpre=8.97e-02 BERpost=2.86e-02 BLER=9.90e-01
+  DVB-S2 (2/3)     SNR=10.20 | BERpre=8.80e-02 BERpost=8.74e-03 BLER=6.76e-01
+  DVB-S2 (2/3)     SNR=10.30 | BERpre=8.63e-02 BERpost=5.62e-04 BLER=9.43e-02
+  DVB-S2 (2/3)     SNR=10.40 | BERpre=8.46e-02 BERpost=7.74e-06 BLER=3.33e-03
+  DVB-S2 (2/3)     SNR=10.50 | BERpre=8.29e-02 BERpost=5.79e-08 BLER=1.25e-03
+  DVB-S2 (2/3)     SNR=10.60 | BERpre=8.13e-02 BERpost=1.93e-08 BLER=4.17e-04
+
+=== 5G NR BG1 (2/3) | N=12672 K=8448 Rc=0.6667 | n=4224 symbols/dim ===
+  5G NR BG1 (2/3)  SNR=10.00 | BERpre=9.16e-02 BERpost=6.81e-02 BLER=1.00e+00
+  5G NR BG1 (2/3)  SNR=10.10 | BERpre=8.96e-02 BERpost=6.39e-02 BLER=1.00e+00
+  5G NR BG1 (2/3)  SNR=10.20 | BERpre=8.79e-02 BERpost=6.09e-02 BLER=1.00e+00
+  5G NR BG1 (2/3)  SNR=10.30 | BERpre=8.62e-02 BERpost=5.67e-02 BLER=1.00e+00
+  5G NR BG1 (2/3)  SNR=10.40 | BERpre=8.43e-02 BERpost=5.17e-02 BLER=9.80e-01
+  5G NR BG1 (2/3)  SNR=10.50 | BERpre=8.26e-02 BERpost=4.44e-02 BLER=9.35e-01
+  5G NR BG1 (2/3)  SNR=10.60 | BERpre=8.13e-02 BERpost=3.63e-02 BLER=8.28e-01
+  5G NR BG1 (2/3)  SNR=10.70 | BERpre=7.95e-02 BERpost=2.17e-02 BLER=5.68e-01
+  5G NR BG1 (2/3)  SNR=10.80 | BERpre=7.79e-02 BERpost=1.05e-02 BLER=2.82e-01
+  5G NR BG1 (2/3)  SNR=10.90 | BERpre=7.62e-02 BERpost=3.18e-03 BLER=9.45e-02
+  5G NR BG1 (2/3)  SNR=11.00 | BERpre=7.46e-02 BERpost=6.70e-04 BLER=1.96e-02
+  5G NR BG1 (2/3)  SNR=11.10 | BERpre=7.28e-02 BERpost=7.53e-05 BLER=2.50e-03
+  5G NR BG1 (2/3)  SNR=11.20 | BERpre=7.13e-02 BERpost=1.66e-05 BLER=4.17e-04
+
+=== 5G NR BG2 (2/3) | N=5760 K=3840 Rc=0.6667 | n=1920 symbols/dim ===
+  5G NR BG2 (2/3)  SNR=10.40 | BERpre=8.47e-02 BERpost=4.12e-02 BLER=1.00e+00
+  5G NR BG2 (2/3)  SNR=10.50 | BERpre=8.28e-02 BERpost=3.49e-02 BLER=9.62e-01
+  5G NR BG2 (2/3)  SNR=10.60 | BERpre=8.21e-02 BERpost=2.94e-02 BLER=9.26e-01
+  5G NR BG2 (2/3)  SNR=10.70 | BERpre=7.96e-02 BERpost=2.01e-02 BLER=7.81e-01
+  5G NR BG2 (2/3)  SNR=10.80 | BERpre=7.79e-02 BERpost=1.49e-02 BLER=6.39e-01
+  5G NR BG2 (2/3)  SNR=10.90 | BERpre=7.63e-02 BERpost=8.80e-03 BLER=4.39e-01
+  5G NR BG2 (2/3)  SNR=11.00 | BERpre=7.44e-02 BERpost=4.34e-03 BLER=2.78e-01
+  5G NR BG2 (2/3)  SNR=11.10 | BERpre=7.33e-02 BERpost=3.24e-03 BLER=2.02e-01
+  5G NR BG2 (2/3)  SNR=11.20 | BERpre=7.13e-02 BERpost=1.14e-03 BLER=9.38e-02
+  5G NR BG2 (2/3)  SNR=11.30 | BERpre=6.98e-02 BERpost=5.55e-04 BLER=5.62e-02
+  5G NR BG2 (2/3)  SNR=11.40 | BERpre=6.79e-02 BERpost=2.88e-04 BLER=3.17e-02
+  5G NR BG2 (2/3)  SNR=11.50 | BERpre=6.64e-02 BERpost=1.08e-04 BLER=1.54e-02
+  5G NR BG2 (2/3)  SNR=11.60 | BERpre=6.48e-02 BERpost=3.86e-05 BLER=8.33e-03
+  5G NR BG2 (2/3)  SNR=11.70 | BERpre=6.30e-02 BERpost=3.88e-05 BLER=8.33e-03
+
+--- DVB-S2 (2/3) (n=21600) ---
+    SNR_dB    BER_pre      BER_post        BLER   
+    ______    ________    __________    __________
+
+      9.7      0.09652      0.067776             1
+      9.8     0.095055      0.061743             1
+      9.9     0.093211      0.052903             1
+       10     0.091308      0.042046             1
+     10.1     0.089687      0.028562        0.9902
+     10.2     0.087986     0.0087431       0.67568
+     10.3     0.086277    0.00056195       0.09434
+     10.4     0.084634    7.7353e-06     0.0033333
+     10.5     0.082923     5.787e-08       0.00125
+     10.6     0.081252     1.929e-08    0.00041667
+
+--- 5G NR BG1 (2/3) (n=4224) ---
+    SNR_dB    BER_pre      BER_post        BLER   
+    ______    ________    __________    __________
+
+       10     0.091575      0.068063             1
+     10.1     0.089619      0.063852             1
+     10.2     0.087896      0.060928             1
+     10.3     0.086233      0.056695             1
+     10.4     0.084327       0.05169       0.98039
+     10.5     0.082649      0.044359       0.93519
+     10.6     0.081322      0.036255       0.82787
+     10.7     0.079478      0.021679       0.56818
+     10.8     0.077944      0.010463       0.28249
+     10.9     0.076174     0.0031788      0.094518
+       11     0.074551    0.00066959      0.019583
+     11.1      0.07281    7.5264e-05        0.0025
+     11.2     0.071253    1.6572e-05    0.00041667
+
+--- 5G NR BG2 (2/3) (n=1920) ---
+    SNR_dB    BER_pre      BER_post       BLER   
+    ______    ________    __________    _________
+
+     10.4      0.08474      0.041177            1
+     10.5     0.082764      0.034928      0.96154
+     10.6     0.082123      0.029415      0.92593
+     10.7     0.079641      0.020135      0.78125
+     10.8     0.077932       0.01485      0.63924
+     10.9     0.076285     0.0087971       0.4386
+       11     0.074424     0.0043446      0.27778
+     11.1     0.073293     0.0032394      0.20243
+     11.2     0.071251     0.0011445     0.093809
+     11.3     0.069772     0.0005554     0.056243
+     11.4     0.067874    0.00028754     0.031667
+     11.5     0.066439    0.00010829     0.015417
+     11.6      0.06484    3.8628e-05    0.0083333
+     11.7     0.063043    3.8845e-05    0.0083333
+
+  saved -> results/fec_bler_dvbs2_vs_nr.{fig,pdf,mat}
+  saved -> results/fec_berpost_dvbs2_vs_nr.{fig,pdf,mat}
+  saved -> results/compare_fec.{fig,pdf,mat}
+=== fin Thu Sep 10 06:38:33 PM CEST 2026 (exit=0) ===

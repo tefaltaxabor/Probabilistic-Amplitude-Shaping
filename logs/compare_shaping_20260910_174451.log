@@ -44,3 +44,27 @@ FEC: DVB-S2 (2/3) | n=21600 | nu sweep = [0 0.025 0.05 0.075 0.1]
   nu=0.075 SNR= 8.90 | BERpost=2.70e-07 BLER=5.83e-03
   nu=0.075 SNR= 9.00 | BERpost=9.65e-08 BLER=2.08e-03
   nu=0.075 SNR= 9.10 | BERpost=7.72e-08 BLER=1.67e-03
+  nu=0.075 SNR= 9.20 | BERpost=1.25e-07 BLER=2.92e-03
+
+=== nu=0.100 | H(A)=1.205 bits/amp | R=2.41 bits/2D ===
+  nu=0.100 SNR= 7.10 | BERpost=2.95e-02 BLER=1.00e+00
+  nu=0.100 SNR= 7.20 | BERpost=2.33e-02 BLER=1.00e+00
+  nu=0.100 SNR= 7.30 | BERpost=1.05e-02 BLER=9.09e-01
+  nu=0.100 SNR= 7.40 | BERpost=1.93e-03 BLER=4.17e-01
+  nu=0.100 SNR= 7.50 | BERpost=1.26e-04 BLER=7.26e-02
+  nu=0.100 SNR= 7.60 | BERpost=8.10e-07 BLER=6.25e-03
+  nu=0.100 SNR= 7.70 | BERpost=2.70e-07 BLER=5.83e-03
+  nu=0.100 SNR= 7.80 | BERpost=1.93e-07 BLER=4.17e-03
+  nu=0.100 SNR= 7.90 | BERpost=1.54e-07 BLER=3.33e-03
+
+ nu     R2D   SNR@BLER  SNRmin  gapCap  shGain[dB]
+ 0.000  4.00       NaN    11.76     NaN     NaN
+ 0.025  3.76     12.05    10.97    1.08     NaN
+ 0.050  3.27     10.37     9.38    0.99     NaN
+ 0.075  2.80      8.87     7.76    1.11     NaN
+ 0.100  2.41      7.58     6.35    1.23     NaN
+  saved -> results/shaping_bler_vs_snr.{fig,pdf,mat}
+  saved -> results/shaping_rate_vs_threshold.{fig,pdf,mat}
+  saved -> results/shaping_gap_and_gain.{fig,pdf,mat}
+  saved -> results/compare_shaping.{fig,pdf,mat}
+=== fin Thu Sep 10 06:28:15 PM CEST 2026 (exit=0) ===
