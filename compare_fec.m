@@ -1,7 +1,10 @@
 %% Gabriel Cabrera
 %% FEC code comparison under PAS 64-QAM: DVB-S2 vs 5G NR LDPC (rate 2/3)
 %% Same chain (shaping, 64-QAM, channel, demapper, parity->sign); only the LDPC changes.
-clear; rng(7);
+%% reuseMC=true redraws the figures from results/compare_fec.mat without
+%% re-simulating:   matlab -batch "reuseMC=true; compare_fec"
+clearvars -except reuseMC; rng(7);
+if ~exist('reuseMC','var'), reuseMC = false; end
 
 % ---------------- Parameters ----------------
 m  = 3;                               % 64-QAM (2 x 8-ASK)
@@ -29,8 +32,14 @@ cstll.px = px;
 % ---------------- Sweep per code ----------------
 nCodes = numel(codes);
 R = struct('name',{},'SNR',{},'berPre',{},'berPost',{},'bler',{},'n',{});
+nSim = nCodes;
+if reuseMC      % redraw only: error-rate curves from the saved .mat, no Monte Carlo
+    L = load(fullfile('results','compare_fec.mat'), 'R');  R = L.R;
+    fprintf('reusing the Monte Carlo in results/compare_fec.mat\n');
+    nSim = 0;
+end
 
-for c = 1:nCodes
+for c = 1:nSim
     cfg = fec.pas_config(m, codes{c});
     snr = ranges{c};  np = numel(snr);
     fprintf('\n=== %s | N=%d K=%d Rc=%.4f | n=%d symbols/dim ===\n', ...
@@ -65,6 +74,11 @@ for c = 1:nCodes
     semilogy(R(c).SNR, yb, '-o', 'Color', co(c,:), 'LineWidth', 1.4, ...
              'DisplayName', sprintf('%s, n=%d', R(c).name, R(c).n));
 end
+any0 = false;      % zero-error points ran all maxFrames -> BLER < 1/(2*maxFrames)
+for c = 1:nCodes
+    any0 = src.mark_no_errors(gca, R(c).SNR, R(c).bler, 1/(2*maxFrames), co(c,:)) | any0;
+end
+if any0, src.no_errors_legend(gca, sprintf('no errors in %d codewords (upper bound)', 2*maxFrames)); end
 set(gca,'YScale','log'); xlabel('SNR [dB]'); ylabel('BLER');
 legend('Location','southwest'); title(sprintf('PAS 64-QAM, rate 2/3, \\nu=%.2g', nu));
 
@@ -74,6 +88,12 @@ for c = 1:nCodes
     semilogy(R(c).SNR, yb, '-s', 'Color', co(c,:), 'LineWidth', 1.4, ...
              'DisplayName', sprintf('%s, n=%d', R(c).name, R(c).n));
 end
+any0 = false;      % post-FEC BER is counted over the 2*n*(m-1) amplitude bits per frame
+for c = 1:nCodes
+    any0 = src.mark_no_errors(gca, R(c).SNR, R(c).berPost, ...
+                              1/(2*maxFrames*R(c).n*(m-1)), co(c,:)) | any0;
+end
+if any0, src.no_errors_legend(gca, 'no errors: < 1/N (N = info bits simulated)'); end
 set(gca,'YScale','log'); xlabel('SNR [dB]'); ylabel('post-FEC BER');
 legend('Location','southwest'); title(sprintf('PAS 64-QAM, rate 2/3, \\nu=%.2g', nu));
 

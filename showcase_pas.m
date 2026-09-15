@@ -6,6 +6,7 @@ function showcase_pas(parts, opts)
 %   showcase_pas(1:6, opts)      % override the Monte-Carlo budget
 %   showcase_pas([4 5], struct('reuseMC',true))
 %                                % redo panels 4-5 from the saved BLER curves
+%                                % (reuseMC also applies to panel 3)
 %
 %   Produces, into results/, the six panels that document the PAS chain on
 %   its own (before HARQ is introduced). Panels 1-2 are pure computation and
@@ -50,8 +51,9 @@ function showcase_pas(parts, opts)
     d.nSymBMD     = 4e5;               % symbols per SNR point for panel 6
     d.outdir      = 'results';
     d.seed        = 7;
-    d.reuseMC     = false;             % panel 4: reload the BLER curves from
-                                       % outdir/pas_nu_sweep.mat instead of
+    d.reuseMC     = false;             % panels 3-4: reload the error-rate
+                                       % curves from outdir/pas_waterfall.mat
+                                       % and outdir/pas_nu_sweep.mat instead of
                                        % re-simulating (rates, thresholds and
                                        % figures are still recomputed)
     opts = merge_opts(d, opts);
@@ -313,29 +315,50 @@ function panel3_waterfall(ctx)
     cs = ctx.cstll;  cs.px = px;
     cs.alphabet = cs.alphabet / sqrt(sum(px(:) .* (cs.alphabet(:).^2)));
 
-    snr = 8.6:0.15:11.6;
-    np  = numel(snr);
-    bpre = nan(1,np); bpost = nan(1,np); bl = nan(1,np);
+    if o.reuseMC
+        f = fullfile(o.outdir, 'pas_waterfall.mat');
+        L = load(f, 'SNR_dB', 'berPre', 'berPost', 'bler');
+        snr = L.SNR_dB;  bpre = L.berPre;  bpost = L.berPost;  bl = L.bler;
+        fprintf('  reusing the Monte Carlo in %s\n', f);
+    else
+        snr = 8.6:0.15:11.6;
+        np  = numel(snr);
+        bpre = nan(1,np); bpost = nan(1,np); bl = nan(1,np);
 
-    for p = 1:np
-        t0 = tic;
-        [a, b, c] = fec.run_point(snr(p), ctx.cfg, cs, pA, ctx.amp_label, ...
-                                  o.maxFrames, o.targetCwErr, o.maxLDPCIter);
-        bpre(p) = a;  bpost(p) = b;  bl(p) = c;
-        fprintf('  [%2d/%2d] SNR=%5.2f | BERpre=%.3e BERpost=%.3e BLER=%.3e (%.1fs)\n', ...
-                p, np, snr(p), a, b, c, toc(t0));
+        for p = 1:np
+            t0 = tic;
+            [a, b, c] = fec.run_point(snr(p), ctx.cfg, cs, pA, ctx.amp_label, ...
+                                      o.maxFrames, o.targetCwErr, o.maxLDPCIter);
+            bpre(p) = a;  bpost(p) = b;  bl(p) = c;
+            fprintf('  [%2d/%2d] SNR=%5.2f | BERpre=%.3e BERpost=%.3e BLER=%.3e (%.1fs)\n', ...
+                    p, np, snr(p), a, b, c, toc(t0));
+        end
     end
 
+    % A zero-error point ran all maxFrames (targetCwErr was never reached), so
+    % its resolution is 1/codewords for BLER and 1/info bits for post-FEC BER.
+    nCw   = 2*o.maxFrames;
+    nBits = nCw * ctx.cfg.K;
+
     fig = figure('Name','PAS waterfall','Color','w','Visible','off');
-    semilogy(snr, nan_zeros(bpre), '-o', snr, nan_zeros(bpost), '-s', ...
-             snr, nan_zeros(bl), '-^', 'LineWidth', 1.4);
-    grid on; xlabel('SNR [dB]'); ylabel('error rate');
-    legend('BER pre-FEC','BER post-FEC','BLER','Location','southwest');
+    ax = axes(fig); hold(ax,'on'); grid(ax,'on'); set(ax,'YScale','log');
+    co = lines(3);
+    semilogy(ax, snr, nan_zeros(bpre),  '-o', 'Color',co(1,:), 'LineWidth',1.4, 'DisplayName','BER pre-FEC');
+    semilogy(ax, snr, nan_zeros(bpost), '-s', 'Color',co(2,:), 'LineWidth',1.4, 'DisplayName','BER post-FEC');
+    semilogy(ax, snr, nan_zeros(bl),    '-^', 'Color',co(3,:), 'LineWidth',1.4, 'DisplayName','BLER');
+    any0 = src.mark_no_errors(ax, snr, bpost, 1/nBits, co(2,:));
+    any0 = src.mark_no_errors(ax, snr, bl, 1/nCw, co(3,:)) | any0;
+    if any0
+        src.no_errors_legend(ax, sprintf('no errors: < 1/N (N = %d codewords)', nCw));
+    end
+    xlabel(ax,'SNR [dB]'); ylabel(ax,'error rate');
+    legend(ax,'Location','southoutside','NumColumns',2);   % inside the axes it covered curves or zero-error markers
     title(sprintf('PAS %d-QAM, %s, \\nu=%.3g (H(A)=%.3f, R=%.2f bit/2D)', ...
           4^ctx.opts.m, ctx.cfg.name, o.nu0, HA, 2*HA));
 
     data = struct('SNR_dB',snr, 'berPre',bpre, 'berPost',bpost, 'bler',bl, ...
-                  'nu',o.nu0, 'HA',HA, 'code',ctx.cfg.code, 'n',ctx.cfg.n);
+                  'nu',o.nu0, 'HA',HA, 'code',ctx.cfg.code, 'n',ctx.cfg.n, ...
+                  'maxFrames',o.maxFrames);
     src.save_result(fig, 'pas_waterfall', o.outdir, data);
     close(fig);
 end
@@ -412,9 +435,16 @@ function S = panel4_nu_sweep(ctx)
                  'LineWidth',1.4, 'MarkerSize',4, ...
                  'DisplayName', sprintf('\\nu=%.3g (R=%.2f bit/2D)', S(i).nu, S(i).R2D_real));
     end
+    any0 = false;
+    for i = 1:nN
+        any0 = src.mark_no_errors(ax, S(i).SNR, S(i).bler, 1/(2*o.maxFrames), co(i,:)) | any0;
+    end
+    if any0
+        src.no_errors_legend(ax, sprintf('no errors in %d codewords (upper bound)', 2*o.maxFrames));
+    end
     yline(ax, o.blerTarget, ':k', 'HandleVisibility','off');
     xlabel(ax,'SNR [dB]'); ylabel(ax,'BLER');
-    title(ax,'(a) BLER vs SNR'); legend(ax,'Location','southwest');
+    title(ax,'(a) BLER vs SNR'); legend(ax,'Location','southoutside','NumColumns',2);
 
     ax = nexttile(tl); hold(ax,'on'); grid(ax,'on');
     yyaxis(ax,'left');

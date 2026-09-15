@@ -3,7 +3,14 @@
 %% Separates two effects that the DVB-S2 vs NR comparison mixed together:
 %%   (1) block length  -> NR BG1 family at several Zc (same code design)
 %%   (2) code design    -> NR BG1 vs NR BG2 at EQUAL n (1760)
-clear; rng(7);
+%% reuseMC=true redraws the figures from results/compare_blocklength.mat
+%% without re-simulating:   matlab -batch "reuseMC=true; compare_blocklength"
+clearvars -except reuseMC; rng(7);
+if ~exist('reuseMC','var'), reuseMC = false; end
+if reuseMC      % redraw only: BLER curves from the saved .mat, no Monte Carlo
+    Lmc = load(fullfile('results','compare_blocklength.mat'), 'Rfam', 'Rmn');
+    fprintf('reusing the Monte Carlo in results/compare_blocklength.mat\n');
+end
 
 m  = 3;  nu = 0.05;
 maxFrames    = 1200;                  % max frames/point (each frame = 2 codewords)
@@ -28,7 +35,7 @@ fam = { {'nr-bg1-2/3',  96, 10.5:0.15:13.2}, ...   % n = 1056
         {'nr-bg1-2/3', 192, 10.2:0.15:12.6}, ...   % n = 2112
         {'nr-bg1-2/3', 384, 10.0:0.15:11.9}, ...   % n = 4224
         {'dvbs2-2/3',  NaN, 9.6:0.15:10.65} };     % n = 21600 (reference)
-Rfam = sweep_jobs(fam, m, P);
+if reuseMC, Rfam = Lmc.Rfam; else, Rfam = sweep_jobs(fam, m, P); end
 
 f1 = figure('Name','PAS 64-QAM: BLER vs blocklength (NR BG1)','Color','w'); hold on; grid on;
 co = parula(numel(Rfam));
@@ -41,15 +48,21 @@ end
 if startsWith(Rfam(end).name,'DVB')   % DVB-S2 reference in black
     h = findobj(gca,'DisplayName',Rfam(end).label); set(h,'Color','k');
 end
+any0 = false;      % zero-error points ran all maxFrames -> BLER < 1/(2*maxFrames)
+for c = 1:numel(Rfam)
+    col = co(c,:);  if startsWith(Rfam(c).name,'DVB'), col = [0 0 0]; end
+    any0 = src.mark_no_errors(gca, Rfam(c).SNR, Rfam(c).bler, 1/(2*maxFrames), col) | any0;
+end
+if any0, src.no_errors_legend(gca, sprintf('no errors in %d codewords (upper bound)', 2*maxFrames)); end
 set(gca,'YScale','log'); xlabel('SNR [dB]'); ylabel('BLER');
-legend('Location','southwest');
+legend('Location','southoutside','NumColumns',2);
 title(sprintf('Blocklength effect (NR BG1 vs DVB-S2), rate 2/3, \\nu=%.2g', nu));
 
 %% ---------- Experiment 2: EQUAL n (1760), BG1 vs BG2 ----------
 % Same n and rate => isolates the base graph design.
 mn = { {'nr-bg1-2/3', 160, 10.4:0.15:12.9}, ...    % n = 11*160 = 1760
        {'nr-bg2-2/3', 352, 10.4:0.15:12.9} };      % n =  5*352 = 1760
-Rmn = sweep_jobs(mn, m, P);
+if reuseMC, Rmn = Lmc.Rmn; else, Rmn = sweep_jobs(mn, m, P); end
 
 f2 = figure('Name','PAS 64-QAM: BG1 vs BG2 at equal n (1760)','Color','w'); hold on; grid on;
 com = lines(numel(Rmn));
@@ -58,8 +71,13 @@ for c = 1:numel(Rmn)
     semilogy(Rmn(c).SNR, yb, '-o', 'Color', com(c,:), 'LineWidth', 1.5, ...
              'DisplayName', Rmn(c).label);
 end
+any0 = false;
+for c = 1:numel(Rmn)
+    any0 = src.mark_no_errors(gca, Rmn(c).SNR, Rmn(c).bler, 1/(2*maxFrames), com(c,:)) | any0;
+end
+if any0, src.no_errors_legend(gca, sprintf('no errors in %d codewords (upper bound)', 2*maxFrames)); end
 set(gca,'YScale','log'); xlabel('SNR [dB]'); ylabel('BLER');
-legend('Location','southwest');
+legend('Location','southoutside','NumColumns',2);
 title(sprintf('NR BG1 vs BG2 at n=1760 (same blocklength and rate), \\nu=%.2g', nu));
 
 % ---------------- Save (figures + data, so plots can be redone without MC) ----------------

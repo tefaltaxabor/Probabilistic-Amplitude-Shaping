@@ -86,8 +86,13 @@ for i = 1:nN
     yb = S(i).bler; yb(yb==0) = NaN;
     semilogy(S(i).SNR, yb, '-o', 'Color', co(i,:), 'LineWidth', 1.4, 'DisplayName', labels{i});
 end
+any0 = false;      % zero-error points ran all maxFrames -> BLER < 1/(2*maxFrames)
+for i = 1:nN
+    any0 = src.mark_no_errors(gca, S(i).SNR, S(i).bler, 1/(2*maxFrames), co(i,:)) | any0;
+end
+if any0, src.no_errors_legend(gca, sprintf('no errors in %d codewords (upper bound)', 2*maxFrames)); end
 set(gca,'YScale','log'); xlabel('SNR [dB]'); ylabel('BLER');
-legend('Location','southwest'); title('PAS 64-QAM, DVB-S2 2/3 — BLER vs SNR');
+legend('Location','southoutside','NumColumns',2); title('PAS 64-QAM, DVB-S2 2/3 — BLER vs SNR');
 
 % Fig 2: throughput R vs SNR threshold against capacity (shaping gain = horizontal gap to capacity)
 snrGrid = 0:0.05:24;
